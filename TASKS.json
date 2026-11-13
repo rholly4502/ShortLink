@@ -14,7 +14,7 @@
   {
     "id": "P0.3",
     "title": "docker-compose.yml + .env (postgres/redis/rabbitmq)",
-    "status": "pending",
+    "status": "done",
     "phase": "P0"
   },
   {
