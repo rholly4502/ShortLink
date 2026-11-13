@@ -32,7 +32,7 @@
   {
     "id": "P1.1",
     "title": "Entities user/ShortLink/Click/ClickAggregate + enum",
-    "status": "pending",
+    "status": "done",
     "phase": "P1"
   },
   {
@@ -133,7 +133,7 @@
   },
   {
     "id": "P4.1",
-    "title": "Konsumsi event klik \u2192 persist clicks",
+    "title": "Konsumsi event klik → persist clicks",
     "status": "pending",
     "phase": "P4"
   },

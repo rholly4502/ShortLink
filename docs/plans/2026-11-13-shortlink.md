@@ -74,3 +74,6 @@ TASKS.json                   # manifest progress (dibaca cron)
 - Jangan ubah scope/urutan tanpa persetujuan user. Kalau task butuh keputusan (mis. nama repo publik/privat), STOP & lapor, jangan menebak.
 - Setelah selesai 1 task: update TASKS.json ke `done`, commit seluruh perubahan, push.
 - Wajib: edit file di `/root/ShortLink` HANYA via heredoc (`cat > f << 'EOF'`) atau `python3 - << 'PY'` — DILARANG pakai write_file/patch.
+
+## Rulings (ledger)
+- **P1.1 — Entity naming**: kelas entity `ShortLink` diubah menjadi `ShortenedUrl`. Sebab: nama type sama dengan root namespace `ShortLink` → konflik C# (CS0118) di semua kode di bawah `ShortLink.*`. Perbaikan permanen (type dipakai di DbSet/DI/service). Konsep tetap sama (one short link). FK/nav di `Click`/`ClickAggregate`: `ShortenedUrlId`/`ShortenedUrl`.
