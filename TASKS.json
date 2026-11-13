@@ -20,7 +20,7 @@
   {
     "id": "P0.4",
     "title": "appsettings + appsettings.Development.json (connection string)",
-    "status": "pending",
+    "status": "done",
     "phase": "P0"
   },
   {
