@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ShortLink.Api/ShortLink.Api.csproj" />
+    <Project Path="src/ShortLink.Core/ShortLink.Core.csproj" />
+    <Project Path="src/ShortLink.Worker/ShortLink.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ShortLink.Core.Tests/ShortLink.Core.Tests.csproj" />
+  </Folder>
+</Solution>
