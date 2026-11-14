@@ -77,3 +77,4 @@ TASKS.json                   # manifest progress (dibaca cron)
 
 ## Rulings (ledger)
 - **P1.1 — Entity naming**: kelas entity `ShortLink` diubah menjadi `ShortenedUrl`. Sebab: nama type sama dengan root namespace `ShortLink` → konflik C# (CS0118) di semua kode di bawah `ShortLink.*`. Perbaikan permanen (type dipakai di DbSet/DI/service). Konsep tetap sama (one short link). FK/nav di `Click`/`ClickAggregate`: `ShortenedUrlId`/`ShortenedUrl`.
+- **P2.2 — Infrastructure project**: ditambahkan proyek `src/ShortLink.Infrastructure` (classlib net10, ref Core). Host `AppDbContext`, entity configurations, `DatabaseSeeder` (seed admin), dan design-time factory. Alasan: Core wajib murni tanpa dependensi infra; Tert Api/Worker perlu DbContext yang sama (P4). Bukan perubahan scope task; konsisten dengan Clean Architecture.

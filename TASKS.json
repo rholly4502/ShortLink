@@ -68,7 +68,7 @@
   {
     "id": "P2.2",
     "title": "AppDbContext + migration + seed admin",
-    "status": "pending",
+    "status": "done",
     "phase": "P2"
   },
   {
