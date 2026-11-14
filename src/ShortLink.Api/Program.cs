@@ -1,6 +1,10 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using ShortLink.Core;
+using ShortLink.Core.Abstractions;
+using ShortLink.Infrastructure.Caching;
+using ShortLink.Infrastructure.Messaging;
 using ShortLink.Infrastructure.Persistence;
 using ShortLink.Infrastructure.Security;
 
@@ -28,6 +32,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 builder.Services.AddAuthorization();
+
+// Clock + device detection (pure)
+builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddSingleton<DeviceTypeDetector>();
+
+// Redis slug cache + resolver
+var redisCs = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+builder.Services.AddSingleton<IRedisStringStore>(_ => new RedisStringStore(redisCs));
+builder.Services.AddSingleton<ISlugCache>(sp =>
+    new RedisSlugCache(sp.GetRequiredService<IRedisStringStore>(), TimeSpan.FromHours(12)));
+builder.Services.AddSingleton<CachedSlugResolver>(sp =>
+    new CachedSlugResolver(
+        sp.GetRequiredService<ISlugCache>(),
+        sp.GetRequiredService<IShortLinkRepository>(),
+        sp.GetRequiredService<IClock>(),
+        TimeSpan.FromHours(12)));
+
+// RabbitMQ click publisher
+var amqp = builder.Configuration["RabbitMQ:ConnectionString"];
+builder.Services.AddSingleton<IMessagePublisher>(_ =>
+    RabbitMqMessagePublisher.CreateAsync(amqp!).GetAwaiter().GetResult());
+builder.Services.AddSingleton<IClickEventPublisher, RabbitMqClickEventPublisher>();
 
 var app = builder.Build();
 

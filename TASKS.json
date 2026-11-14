@@ -110,7 +110,7 @@
   {
     "id": "P3.3",
     "title": "GET /{slug} + Redis + emisi event klik",
-    "status": "pending",
+    "status": "done",
     "phase": "P3"
   },
   {
@@ -133,7 +133,7 @@
   },
   {
     "id": "P4.1",
-    "title": "Konsumsi event klik → persist clicks",
+    "title": "Konsumsi event klik \u2192 persist clicks",
     "status": "pending",
     "phase": "P4"
   },

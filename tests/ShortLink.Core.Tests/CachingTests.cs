@@ -18,14 +18,14 @@ public class RedisSlugCacheTests
     }
 
     [Fact]
-    public async Task GetAsync_WhenStoreHasValue_ReturnsValue()
+    public async Task GetAsync_WhenStoreHasInvalidJson_ReturnsNull()
     {
-        var store = new FakeRedisStringStore { Values = { ["slug:abc123"] = "https://example.com" } };
+        var store = new FakeRedisStringStore { Values = { ["slug:abc123"] = "not-json" } };
         var cache = new RedisSlugCache(store, TimeSpan.FromHours(12));
 
         var result = await cache.GetAsync("abc123");
 
-        Assert.Equal("https://example.com", result);
+        Assert.Null(result);
     }
 
     [Fact]
@@ -34,12 +34,12 @@ public class RedisSlugCacheTests
         var store = new FakeRedisStringStore();
         var ttl = TimeSpan.FromHours(24);
         var cache = new RedisSlugCache(store, ttl);
+        var link = NewLink("abc123");
 
-        await cache.SetAsync("abc123", "https://example.com", ttl);
+        await cache.SetAsync("abc123", link, ttl);
 
         var entry = Assert.Single(store.Entries);
         Assert.Equal("slug:abc123", entry.Key);
-        Assert.Equal("https://example.com", entry.Value);
         Assert.Equal(ttl, entry.Ttl);
     }
 
@@ -49,10 +49,36 @@ public class RedisSlugCacheTests
         var store = new FakeRedisStringStore();
         var cache = new RedisSlugCache(store, TimeSpan.FromHours(12));
 
-        await cache.SetAsync("abc123", "https://example.com");
+        await cache.SetAsync("abc123", NewLink("abc123"));
 
         Assert.Equal(TimeSpan.FromHours(12), store.Entries.Single().Ttl);
     }
+
+    [Fact]
+    public async Task RoundTrip_PersistsShortenedUrl()
+    {
+        var store = new FakeRedisStringStore();
+        var cache = new RedisSlugCache(store, TimeSpan.FromHours(12));
+        var link = NewLink("abc123");
+
+        await cache.SetAsync("abc123", link);
+        var result = await cache.GetAsync("abc123");
+
+        Assert.NotNull(result);
+        Assert.Equal(link.Id, result!.Id);
+        Assert.Equal(link.Slug, result.Slug);
+        Assert.Equal(link.Url, result.Url);
+    }
+
+    private static ShortenedUrl NewLink(string slug) => new()
+    {
+        Id = Guid.NewGuid(),
+        Slug = slug,
+        Url = "https://example.com/" + slug,
+        OwnerId = Guid.NewGuid(),
+        CreatedAt = DateTimeOffset.UtcNow,
+        ExpiresAt = null
+    };
 }
 
 public class CachedSlugResolverTests
@@ -60,15 +86,16 @@ public class CachedSlugResolverTests
     private readonly FixedClock _clock = new();
 
     [Fact]
-    public async Task Resolve_CacheHit_ReturnsUrlWithoutQueryingRepo()
+    public async Task Resolve_CacheHit_ReturnsLinkWithoutQueryingRepo()
     {
-        var cache = new FakeSlugCache { Values = { ["abc123"] = "https://example.com" } };
+        var cache = new FakeSlugCache { Links = { ["abc123"] = NewLink("abc123") } };
         var repo = new ThrowingRepository();
         var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
 
-        var url = await resolver.ResolveUrlAsync("abc123");
+        var link = await resolver.ResolveAsync("abc123");
 
-        Assert.Equal("https://example.com", url);
+        Assert.NotNull(link);
+        Assert.Equal("abc123", link!.Slug);
     }
 
     [Fact]
@@ -79,10 +106,10 @@ public class CachedSlugResolverTests
         repo.BySlug["abc123"] = NewLink("abc123");
         var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
 
-        var url = await resolver.ResolveUrlAsync("abc123");
+        var link = await resolver.ResolveAsync("abc123");
 
-        Assert.Equal("https://example.com/abc123", url);
-        Assert.True(cache.Values.ContainsKey("abc123"));
+        Assert.NotNull(link);
+        Assert.True(cache.Links.ContainsKey("abc123"));
     }
 
     [Fact]
@@ -92,10 +119,10 @@ public class CachedSlugResolverTests
         var repo = new FakeRepo();
         var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
 
-        var url = await resolver.ResolveUrlAsync("nope");
+        var link = await resolver.ResolveAsync("nope");
 
-        Assert.Null(url);
-        Assert.Empty(cache.Values);
+        Assert.Null(link);
+        Assert.Empty(cache.Links);
     }
 
     [Fact]
@@ -106,10 +133,19 @@ public class CachedSlugResolverTests
         repo.BySlug["old"] = NewLink("old", expiresAt: _clock.UtcNow.AddHours(-1));
         var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
 
-        var url = await resolver.ResolveUrlAsync("old");
+        var link = await resolver.ResolveAsync("old");
 
-        Assert.Null(url);
-        Assert.Empty(cache.Values);
+        Assert.Null(link);
+        Assert.Empty(cache.Links);
+    }
+
+    [Fact]
+    public async Task Resolve_NullOrWhitespace_ReturnsNull()
+    {
+        var resolver = new CachedSlugResolver(new FakeSlugCache(), new FakeRepo(), _clock, TimeSpan.FromHours(12));
+
+        Assert.Null(await resolver.ResolveAsync(null));
+        Assert.Null(await resolver.ResolveAsync("  "));
     }
 
     private static ShortenedUrl NewLink(string slug, DateTimeOffset? expiresAt = null) => new()
@@ -185,14 +221,14 @@ public sealed class FakeRedisStringStore : IRedisStringStore
 
 public sealed class FakeSlugCache : ISlugCache
 {
-    public Dictionary<string, string> Values { get; } = new();
+    public Dictionary<string, ShortenedUrl> Links { get; } = new();
 
-    public Task<string?> GetAsync(string slug, CancellationToken ct = default)
-        => Task.FromResult(Values.TryGetValue(slug, out var v) ? v : null);
+    public Task<ShortenedUrl?> GetAsync(string slug, CancellationToken ct = default)
+        => Task.FromResult(Links.TryGetValue(slug, out var l) ? l : null);
 
-    public Task SetAsync(string slug, string url, TimeSpan? ttl = null, CancellationToken ct = default)
+    public Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default)
     {
-        Values[slug] = url;
+        Links[slug] = link;
         return Task.CompletedTask;
     }
 }

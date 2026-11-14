@@ -1,9 +1,11 @@
+using ShortLink.Core.Entities;
+
 namespace ShortLink.Core.Abstractions;
 
-/// <summary>Cache slug → URL asli (mis. Redis).</summary>
+/// <summary>Cache slug → ShortenedUrl (mis. Redis). Menyimpan entitas agar event klik bisa memakai Id.</summary>
 public interface ISlugCache
 {
-    Task<string?> GetAsync(string slug, CancellationToken ct = default);
+    Task<ShortenedUrl?> GetAsync(string slug, CancellationToken ct = default);
 
-    Task SetAsync(string slug, string url, TimeSpan? ttl = null, CancellationToken ct = default);
+    Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default);
 }
