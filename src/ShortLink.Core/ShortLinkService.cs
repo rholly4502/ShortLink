@@ -68,6 +68,46 @@ public sealed class ShortLinkService
         return link;
     }
 
+    public async Task<List<ShortenedUrl>> ListForOwnerAsync(Guid ownerId, CancellationToken ct = default)
+        => await _repository.GetByOwnerAsync(ownerId, ct);
+
+    public async Task<ShortenedUrl?> GetForOwnerAsync(Guid ownerId, Guid id, CancellationToken ct = default)
+    {
+        var link = await _repository.GetByIdAsync(id, ct);
+        return link is not null && link.OwnerId == ownerId ? link : null;
+    }
+
+    public async Task<ShortenedUrl> UpdateUrlAsync(
+        Guid ownerId,
+        Guid id,
+        string url,
+        DateTimeOffset? expiresAt,
+        CancellationToken ct = default)
+    {
+        if (!_urlValidator.TryNormalize(url, out var normalized))
+            throw new ArgumentException("URL tidak valid atau tidak aman.", nameof(url));
+
+        var link = await _repository.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException("Short link tidak ditemukan.");
+        if (link.OwnerId != ownerId)
+            throw new UnauthorizedAccessException();
+
+        link.Url = normalized.ToString();
+        link.ExpiresAt = expiresAt;
+        await _repository.UpdateAsync(link, ct);
+        return link;
+    }
+
+    public async Task DeleteByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct = default)
+    {
+        var link = await _repository.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException("Short link tidak ditemukan.");
+        if (link.OwnerId != ownerId)
+            throw new UnauthorizedAccessException();
+
+        await _repository.DeleteAsync(link, ct);
+    }
+
     /// <summary>Agregasi klik murni (tanpa dependensi infra) per periode/device/country.</summary>
     public static IReadOnlyList<ClickAggregate> AggregateClicks(IEnumerable<Click> clicks, AggregatePeriod period)
     {
