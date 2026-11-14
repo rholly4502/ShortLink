@@ -80,7 +80,7 @@
   {
     "id": "P2.4",
     "title": "RedisSlugCache + fallback PG",
-    "status": "pending",
+    "status": "done",
     "phase": "P2"
   },
   {
