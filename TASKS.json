@@ -50,7 +50,7 @@
   {
     "id": "P1.4",
     "title": "UrlValidator (cegah open-redirect) + test",
-    "status": "pending",
+    "status": "done",
     "phase": "P1"
   },
   {
