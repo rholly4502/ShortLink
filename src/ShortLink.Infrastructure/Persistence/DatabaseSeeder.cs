@@ -3,7 +3,7 @@ using ShortLink.Core.Entities;
 
 namespace ShortLink.Infrastructure.Persistence;
 
-public sealed class DatabaseSeeder
+public sealed class DatabaseSeeder : IAdminSeeder
 {
     private readonly AppDbContext _db;
 
