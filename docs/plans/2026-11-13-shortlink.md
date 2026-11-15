@@ -66,7 +66,7 @@ TASKS.json                   # manifest progress (dibaca cron)
 - [ ] P5.1 Uji keamanan: open-redirect, rate-limit, auth bypass, input injection
 - [ ] P5.2 README (cara jalan, arsitektur, screenshot/curl)
 - [ ] P5.3 Deploy notes (VPS / Docker Compose prod)
-- [ ] P5.4 Uji end-to-end manual (curl flow lengkap)
+- [x] P5.4 Uji end-to-end manual (curl flow lengkap)
 
 ## Aturan untuk cron
 - Baca `TASKS.json`; kerjakan SATU task pertama yang `pending` (urutan P0→P5).

@@ -1,173 +1,173 @@
 [
-  {
-    "id": "P0.1",
-    "title": "Scaffold solusi + referensi + build hijau",
-    "status": "done",
-    "phase": "P0"
-  },
-  {
-    "id": "P0.2",
-    "title": "Tulis rencana + TASKS.json",
-    "status": "done",
-    "phase": "P0"
-  },
-  {
-    "id": "P0.3",
-    "title": "docker-compose.yml + .env (postgres/redis/rabbitmq)",
-    "status": "done",
-    "phase": "P0"
-  },
-  {
-    "id": "P0.4",
-    "title": "appsettings + appsettings.Development.json (connection string)",
-    "status": "done",
-    "phase": "P0"
-  },
-  {
-    "id": "P0.5",
-    "title": "Commit awal + push repo (konfirmasi publik/privat)",
-    "status": "done",
-    "phase": "P0"
-  },
-  {
-    "id": "P1.1",
-    "title": "Entities user/ShortLink/Click/ClickAggregate + enum",
-    "status": "done",
-    "phase": "P1"
-  },
-  {
-    "id": "P1.2",
-    "title": "Abstraksi repository/service/clock",
-    "status": "done",
-    "phase": "P1"
-  },
-  {
-    "id": "P1.3",
-    "title": "SlugGenerator base62 + test",
-    "status": "done",
-    "phase": "P1"
-  },
-  {
-    "id": "P1.4",
-    "title": "UrlValidator (cegah open-redirect) + test",
-    "status": "done",
-    "phase": "P1"
-  },
-  {
-    "id": "P1.5",
-    "title": "ShortLinkService (create/resolve/validate/analytics) + test",
-    "status": "done",
-    "phase": "P1"
-  },
-  {
-    "id": "P2.1",
-    "title": "Tambah package (Npgsql, Redis, RabbitMQ, BCrypt)",
-    "status": "done",
-    "phase": "P2"
-  },
-  {
-    "id": "P2.2",
-    "title": "AppDbContext + migration + seed admin",
-    "status": "done",
-    "phase": "P2"
-  },
-  {
-    "id": "P2.3",
-    "title": "Implementasi repositori EF Core",
-    "status": "done",
-    "phase": "P2"
-  },
-  {
-    "id": "P2.4",
-    "title": "RedisSlugCache + fallback PG",
-    "status": "done",
-    "phase": "P2"
-  },
-  {
-    "id": "P2.5",
-    "title": "ClickEventPublisher + ClickEventConsumer (worker)",
-    "status": "done",
-    "phase": "P2"
-  },
-  {
-    "id": "P2.6",
-    "title": "Auto-migrate startup + compose siap",
-    "status": "done",
-    "phase": "P2"
-  },
-  {
-    "id": "P3.1",
-    "title": "JWT auth register/login/refresh + role",
-    "status": "done",
-    "phase": "P3"
-  },
-  {
-    "id": "P3.2",
-    "title": "CRUD short link + owner check",
-    "status": "done",
-    "phase": "P3"
-  },
-  {
-    "id": "P3.3",
-    "title": "GET /{slug} + Redis + emisi event klik",
-    "status": "done",
-    "phase": "P3"
-  },
-  {
-    "id": "P3.4",
-    "title": "Analytics endpoint",
-    "status": "done",
-    "phase": "P3"
-  },
-  {
-    "id": "P3.5",
-    "title": "Rate-limit middleware (Redis)",
-    "status": "done",
-    "phase": "P3"
-  },
-  {
-    "id": "P3.6",
-    "title": "Validasi input + error handling",
-    "status": "done",
-    "phase": "P3"
-  },
-  {
-    "id": "P4.1",
-    "title": "Konsumsi event klik → persist clicks",
-    "status": "done",
-    "phase": "P4"
-  },
-  {
-    "id": "P4.2",
-    "title": "Agregasi per jam/hari/device/country",
-    "status": "done",
-    "phase": "P4"
-  },
-  {
-    "id": "P5.1",
-    "title": "Uji keamanan (open-redirect, rate-limit, auth)",
-    "status": "done",
-    "phase": "P5",
-    "completed_at": "2026-11-15"
-  },
-  {
-    "id": "P5.2",
-    "title": "README",
-    "status": "done",
-    "phase": "P5",
-    "completed_at": "2026-11-15"
-  },
-  {
-    "id": "P5.3",
-    "title": "Deploy notes",
-    "status": "done",
-    "phase": "P5",
-    "completed_at": "2026-11-15"
-  },
-  {
-    "id": "P5.4",
-    "title": "Uji end-to-end manual",
-    "status": "pending",
-    "phase": "P5"
-  }
+ {
+  "id": "P0.1",
+  "title": "Scaffold solusi + referensi + build hijau",
+  "status": "done",
+  "phase": "P0"
+ },
+ {
+  "id": "P0.2",
+  "title": "Tulis rencana + TASKS.json",
+  "status": "done",
+  "phase": "P0"
+ },
+ {
+  "id": "P0.3",
+  "title": "docker-compose.yml + .env (postgres/redis/rabbitmq)",
+  "status": "done",
+  "phase": "P0"
+ },
+ {
+  "id": "P0.4",
+  "title": "appsettings + appsettings.Development.json (connection string)",
+  "status": "done",
+  "phase": "P0"
+ },
+ {
+  "id": "P0.5",
+  "title": "Commit awal + push repo (konfirmasi publik/privat)",
+  "status": "done",
+  "phase": "P0"
+ },
+ {
+  "id": "P1.1",
+  "title": "Entities user/ShortLink/Click/ClickAggregate + enum",
+  "status": "done",
+  "phase": "P1"
+ },
+ {
+  "id": "P1.2",
+  "title": "Abstraksi repository/service/clock",
+  "status": "done",
+  "phase": "P1"
+ },
+ {
+  "id": "P1.3",
+  "title": "SlugGenerator base62 + test",
+  "status": "done",
+  "phase": "P1"
+ },
+ {
+  "id": "P1.4",
+  "title": "UrlValidator (cegah open-redirect) + test",
+  "status": "done",
+  "phase": "P1"
+ },
+ {
+  "id": "P1.5",
+  "title": "ShortLinkService (create/resolve/validate/analytics) + test",
+  "status": "done",
+  "phase": "P1"
+ },
+ {
+  "id": "P2.1",
+  "title": "Tambah package (Npgsql, Redis, RabbitMQ, BCrypt)",
+  "status": "done",
+  "phase": "P2"
+ },
+ {
+  "id": "P2.2",
+  "title": "AppDbContext + migration + seed admin",
+  "status": "done",
+  "phase": "P2"
+ },
+ {
+  "id": "P2.3",
+  "title": "Implementasi repositori EF Core",
+  "status": "done",
+  "phase": "P2"
+ },
+ {
+  "id": "P2.4",
+  "title": "RedisSlugCache + fallback PG",
+  "status": "done",
+  "phase": "P2"
+ },
+ {
+  "id": "P2.5",
+  "title": "ClickEventPublisher + ClickEventConsumer (worker)",
+  "status": "done",
+  "phase": "P2"
+ },
+ {
+  "id": "P2.6",
+  "title": "Auto-migrate startup + compose siap",
+  "status": "done",
+  "phase": "P2"
+ },
+ {
+  "id": "P3.1",
+  "title": "JWT auth register/login/refresh + role",
+  "status": "done",
+  "phase": "P3"
+ },
+ {
+  "id": "P3.2",
+  "title": "CRUD short link + owner check",
+  "status": "done",
+  "phase": "P3"
+ },
+ {
+  "id": "P3.3",
+  "title": "GET /{slug} + Redis + emisi event klik",
+  "status": "done",
+  "phase": "P3"
+ },
+ {
+  "id": "P3.4",
+  "title": "Analytics endpoint",
+  "status": "done",
+  "phase": "P3"
+ },
+ {
+  "id": "P3.5",
+  "title": "Rate-limit middleware (Redis)",
+  "status": "done",
+  "phase": "P3"
+ },
+ {
+  "id": "P3.6",
+  "title": "Validasi input + error handling",
+  "status": "done",
+  "phase": "P3"
+ },
+ {
+  "id": "P4.1",
+  "title": "Konsumsi event klik → persist clicks",
+  "status": "done",
+  "phase": "P4"
+ },
+ {
+  "id": "P4.2",
+  "title": "Agregasi per jam/hari/device/country",
+  "status": "done",
+  "phase": "P4"
+ },
+ {
+  "id": "P5.1",
+  "title": "Uji keamanan (open-redirect, rate-limit, auth)",
+  "status": "done",
+  "phase": "P5",
+  "completed_at": "2026-11-15"
+ },
+ {
+  "id": "P5.2",
+  "title": "README",
+  "status": "done",
+  "phase": "P5",
+  "completed_at": "2026-11-15"
+ },
+ {
+  "id": "P5.3",
+  "title": "Deploy notes",
+  "status": "done",
+  "phase": "P5",
+  "completed_at": "2026-11-15"
+ },
+ {
+  "id": "P5.4",
+  "title": "Uji end-to-end manual",
+  "status": "done",
+  "phase": "P5"
+ }
 ]
