@@ -160,8 +160,9 @@
   {
     "id": "P5.3",
     "title": "Deploy notes",
-    "status": "pending",
-    "phase": "P5"
+    "status": "done",
+    "phase": "P5",
+    "completed_at": "2026-11-15"
   },
   {
     "id": "P5.4",
