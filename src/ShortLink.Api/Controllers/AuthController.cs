@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ShortLink.Api.Errors;
 using ShortLink.Api.Models;
 using ShortLink.Core;
 using ShortLink.Core.Auth;
@@ -21,13 +22,9 @@ public sealed class AuthController : ControllerBase
             var user = await _auth.RegisterAsync(request.Username, request.Email, request.Password, ct);
             return CreatedAtAction(nameof(Register), new UserResponse(user.Id, user.Username, user.Email, user.Role.ToString()));
         }
-        catch (ArgumentException ex)
+        catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
+            return ErrorMapper.Result<UserResponse>(ex);
         }
     }
 
@@ -41,7 +38,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException)
         {
-            return Unauthorized(new { message = "Kredensial salah." });
+            return Unauthorized(new ApiError("Kredensial salah."));
         }
     }
 
@@ -55,7 +52,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException)
         {
-            return Unauthorized(new { message = "Refresh token tidak valid." });
+            return Unauthorized(new ApiError("Refresh token tidak valid."));
         }
     }
 

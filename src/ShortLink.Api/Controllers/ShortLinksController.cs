@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ShortLink.Api.Errors;
 using ShortLink.Api.Models;
 using ShortLink.Core;
 using ShortLink.Core.Entities;
@@ -26,9 +27,9 @@ public sealed class ShortLinksController : ControllerBase
             var link = await _service.CreateAsync(CurrentUserId(), request.Url, request.ExpiresAt, ct);
             return CreatedAtAction(nameof(Get), new { id = link.Id }, ToResponse(link));
         }
-        catch (ArgumentException ex)
+        catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return ErrorMapper.Result<LinkResponse>(ex);
         }
     }
 
@@ -60,17 +61,9 @@ public sealed class ShortLinksController : ControllerBase
             var link = await _service.UpdateUrlAsync(CurrentUserId(), id, request.Url, request.ExpiresAt, ct);
             return Ok(ToResponse(link));
         }
-        catch (ArgumentException ex)
+        catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return NotFound();
+            return ErrorMapper.Result<LinkResponse>(ex);
         }
     }
 
@@ -93,13 +86,9 @@ public sealed class ShortLinksController : ControllerBase
             await _service.DeleteByOwnerAsync(CurrentUserId(), id, ct);
             return NoContent();
         }
-        catch (KeyNotFoundException)
+        catch (Exception ex)
         {
-            return NotFound();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return NotFound();
+            return ErrorMapper.Result(ex);
         }
     }
 

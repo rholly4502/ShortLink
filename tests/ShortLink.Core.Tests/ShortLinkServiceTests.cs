@@ -94,7 +94,16 @@ public class ShortLinkServiceTests
     [Fact]
     public async Task Resolve_ExpiredSlug_ReturnsNull()
     {
-        var link = await _sut.CreateAsync(Guid.NewGuid(), "https://example.com", _clock.UtcNow.AddHours(-1));
+        // seed slug kedaluwarsa langsung via repo (CreateAsync menolak expiry lampau)
+        var link = new ShortenedUrl
+        {
+            Id = Guid.NewGuid(),
+            Slug = "expired1",
+            Url = "https://example.com",
+            OwnerId = Guid.NewGuid(),
+            CreatedAt = _clock.UtcNow.AddDays(-2),
+            ExpiresAt = _clock.UtcNow.AddHours(-1)
+        };
         _repo.ById[link.Id] = link;
         _repo.BySlug[link.Slug] = link;
 

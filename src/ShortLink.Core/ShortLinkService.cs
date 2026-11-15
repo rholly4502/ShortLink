@@ -35,6 +35,9 @@ public sealed class ShortLinkService
         if (!_urlValidator.TryNormalize(url, out var normalized))
             throw new ArgumentException("URL tidak valid atau tidak aman.", nameof(url));
 
+        if (expiresAt is { } expiry && expiry <= _clock.UtcNow)
+            throw new ArgumentException("ExpiresAt harus berada di masa depan.", nameof(expiresAt));
+
         string slug;
         do
         {
@@ -89,6 +92,9 @@ public sealed class ShortLinkService
     {
         if (!_urlValidator.TryNormalize(url, out var normalized))
             throw new ArgumentException("URL tidak valid atau tidak aman.", nameof(url));
+
+        if (expiresAt is { } expiry && expiry <= _clock.UtcNow)
+            throw new ArgumentException("ExpiresAt harus berada di masa depan.", nameof(expiresAt));
 
         var link = await _repository.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException("Short link tidak ditemukan.");

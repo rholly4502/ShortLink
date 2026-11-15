@@ -128,12 +128,12 @@
   {
     "id": "P3.6",
     "title": "Validasi input + error handling",
-    "status": "pending",
+    "status": "done",
     "phase": "P3"
   },
   {
     "id": "P4.1",
-    "title": "Konsumsi event klik \u2192 persist clicks",
+    "title": "Konsumsi event klik → persist clicks",
     "status": "pending",
     "phase": "P4"
   },
