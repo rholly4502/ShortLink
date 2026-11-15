@@ -153,8 +153,9 @@
   {
     "id": "P5.2",
     "title": "README",
-    "status": "pending",
-    "phase": "P5"
+    "status": "done",
+    "phase": "P5",
+    "completed_at": "2026-11-15"
   },
   {
     "id": "P5.3",
