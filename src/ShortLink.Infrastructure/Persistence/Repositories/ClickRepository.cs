@@ -27,4 +27,7 @@ public sealed class ClickRepository : IClickRepository
         await _db.ClickAggregates.AddAsync(aggregate, ct);
         await _db.SaveChangesAsync(ct);
     }
+
+    public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
+        => _db.ClickAggregates.Where(a => a.ShortenedUrlId == shortenedUrlId).ToListAsync(ct);
 }

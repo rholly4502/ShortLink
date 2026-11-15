@@ -9,12 +9,14 @@ public class ShortLinkServiceTests
     private readonly FixedClock _clock = new();
     private readonly SequenceSlugGenerator _slugs;
     private readonly FakeShortLinkRepository _repo = new();
+    private readonly FakeClickRepository _clickRepo = new();
+    private readonly Guid _owner = Guid.NewGuid();
     private readonly ShortLinkService _sut;
 
     public ShortLinkServiceTests()
     {
         _slugs = new SequenceSlugGenerator(["abc1234", "xyz9999"]);
-        _sut = new ShortLinkService(_repo, _slugs, new UrlValidator(), _clock);
+        _sut = new ShortLinkService(_repo, _slugs, new UrlValidator(), _clock, _clickRepo);
     }
 
     // --- Create ---
@@ -250,5 +252,84 @@ public class ShortLinkServiceTests
         public Task UpdateAsync(ShortenedUrl link, CancellationToken ct = default) => Task.CompletedTask;
 
         public Task DeleteAsync(ShortenedUrl link, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    // --- Analytics (service) ---
+
+    private static ClickAggregate MakeAggregate(Guid linkId, DateTimeOffset day, DeviceType device, string? country, long count) => new()
+    {
+        Id = Guid.NewGuid(),
+        ShortenedUrlId = linkId,
+        PeriodStart = day.Date,
+        Period = AggregatePeriod.Daily,
+        Device = device,
+        Country = country,
+        Count = count
+    };
+
+    [Fact]
+    public async Task GetAnalytics_AsOwner_ReturnsSummaryFromDailyAggregates()
+    {
+        var link = await _sut.CreateAsync(_owner, "https://example.com");
+        _repo.ById[link.Id] = link;
+        _repo.BySlug[link.Slug] = link;
+
+        var day1 = new DateTimeOffset(2026, 11, 13, 0, 0, 0, TimeSpan.Zero);
+        var day2 = new DateTimeOffset(2026, 11, 14, 0, 0, 0, TimeSpan.Zero);
+        _clickRepo.Aggregates.Add(MakeAggregate(link.Id, day1, DeviceType.Desktop, "ID", 2));
+        _clickRepo.Aggregates.Add(MakeAggregate(link.Id, day1, DeviceType.Mobile, "ID", 1));
+        _clickRepo.Aggregates.Add(MakeAggregate(link.Id, day2, DeviceType.Desktop, "US", 1));
+        // agregasi hourly tidak boleh dihitung dua kali (hanya Daily dipakai)
+        _clickRepo.Aggregates.Add(new ClickAggregate
+        {
+            Id = Guid.NewGuid(),
+            ShortenedUrlId = link.Id,
+            PeriodStart = day1.AddHours(9),
+            Period = AggregatePeriod.Hourly,
+            Device = DeviceType.Desktop,
+            Country = "ID",
+            Count = 2
+        });
+
+        var summary = await _sut.GetAnalyticsAsync(_owner, link.Id);
+
+        Assert.NotNull(summary);
+        Assert.Equal(4L, summary!.TotalClicks);
+        var desktop = Assert.Single(summary.ByDevice, d => d.Device == "Desktop");
+        Assert.Equal(3L, desktop.Count);
+        var idCountry = Assert.Single(summary.ByCountry, c => c.Country == "ID");
+        Assert.Equal(3L, idCountry.Count);
+        Assert.Equal(2, summary.ByDay.Count);
+        Assert.Equal(3L, summary.ByDay.Single(d => d.Day == day1.Date).Count);
+    }
+
+    [Fact]
+    public async Task GetAnalytics_NonOwner_ReturnsNull()
+    {
+        var link = await _sut.CreateAsync(_owner, "https://example.com");
+        _repo.ById[link.Id] = link;
+        _repo.BySlug[link.Slug] = link;
+
+        Assert.Null(await _sut.GetAnalyticsAsync(Guid.NewGuid(), link.Id));
+    }
+
+    [Fact]
+    public async Task GetAnalytics_UnknownLink_ReturnsNull()
+    {
+        Assert.Null(await _sut.GetAnalyticsAsync(_owner, Guid.NewGuid()));
+    }
+
+    private sealed class FakeClickRepository : IClickRepository
+    {
+        public List<ClickAggregate> Aggregates { get; } = new();
+
+        public Task AddAsync(Click click, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task AddRangeAsync(IEnumerable<Click> clicks, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
+            => Task.FromResult(Aggregates.Where(a => a.ShortenedUrlId == shortenedUrlId).ToList());
     }
 }

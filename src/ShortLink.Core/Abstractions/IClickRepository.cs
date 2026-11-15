@@ -9,4 +9,6 @@ public interface IClickRepository
     Task AddRangeAsync(IEnumerable<Click> clicks, CancellationToken ct = default);
 
     Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default);
+
+    Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default);
 }

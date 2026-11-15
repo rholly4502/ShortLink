@@ -54,7 +54,7 @@ TASKS.json                   # manifest progress (dibaca cron)
 - [ ] P3.1 JWT auth: register/login/refresh endpoint + role
 - [ ] P3.2 CRUD short link endpoint (create/list/get/update/delete) + owner check
 - [ ] P3.3 Endpoint publik `GET /{slug}` + hit Redis + emisi event klik
-- [ ] P3.4 Endpoint analytics `GET /api/links/{id}/analytics`
+- [x] P3.4 Endpoint analytics `GET /api/links/{id}/analytics`
 - [ ] P3.5 Middleware rate-limit berbasis Redis (API & redirect)
 - [ ] P3.6 Validasi input + error handling konsisten
 

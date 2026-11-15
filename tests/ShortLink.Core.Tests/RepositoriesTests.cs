@@ -258,4 +258,30 @@ public class RepositoriesTests : IDisposable
         Assert.Equal(5, saved.Count);
         Assert.Equal("US", saved.Country);
     }
+    // ---- IClickRepository ----
+
+    [Fact]
+    public async Task GetByShortLinkId_ReturnsOnlyThatLinksAggregates()
+    {
+        await using var ctx = CreateContext();
+        await ctx.Database.EnsureCreatedAsync();
+        var owner = NewUser("oAna");
+        var linkA = NewLink(owner, "anaa");
+        var linkB = NewLink(owner, "anab");
+        await ctx.Users.AddAsync(owner);
+        await ctx.ShortLinks.AddRangeAsync(linkA, linkB);
+        await ctx.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow.Date;
+        var aggA = new ClickAggregate { Id = Guid.NewGuid(), ShortenedUrlId = linkA.Id, PeriodStart = now, Period = AggregatePeriod.Daily, Device = DeviceType.Desktop, Country = "ID", Count = 3 };
+        var aggB = new ClickAggregate { Id = Guid.NewGuid(), ShortenedUrlId = linkB.Id, PeriodStart = now, Period = AggregatePeriod.Daily, Device = DeviceType.Mobile, Country = "US", Count = 1 };
+        await ctx.ClickAggregates.AddRangeAsync(aggA, aggB);
+        await ctx.SaveChangesAsync();
+
+        var repo = new ClickRepository(ctx);
+        var got = await repo.GetByShortLinkIdAsync(linkA.Id);
+
+        Assert.Single(got);
+        Assert.Equal(aggA.Id, got[0].Id);
+    }
 }

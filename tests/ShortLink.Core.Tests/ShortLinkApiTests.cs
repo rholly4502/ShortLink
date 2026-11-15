@@ -17,10 +17,11 @@ public class ShortLinkApiTests
     private readonly ShortLinkService _service;
     private readonly Guid _owner = Guid.NewGuid();
     private readonly Guid _other = Guid.NewGuid();
+    private readonly FakeClickRepository _clickRepo = new();
 
     public ShortLinkApiTests()
     {
-        _service = new ShortLinkService(_repo, _slugs, new UrlValidator(), _clock);
+        _service = new ShortLinkService(_repo, _slugs, new UrlValidator(), _clock, _clickRepo);
     }
 
     private async Task<ShortenedUrl> SeedLink(Guid ownerId, string url = "https://example.com")
@@ -336,5 +337,64 @@ public class ShortLinkApiTests
             BySlug.Remove(link.Slug);
             return Task.CompletedTask;
         }
+    }
+
+    // --- Controller: analytics ---
+
+    [Fact]
+    public async Task Analytics_AsOwner_ReturnsOkWithSummary()
+    {
+        var link = await SeedLink(_owner);
+        _clickRepo.Aggregates.Add(new ClickAggregate
+        {
+            Id = Guid.NewGuid(),
+            ShortenedUrlId = link.Id,
+            PeriodStart = _clock.UtcNow.Date,
+            Period = AggregatePeriod.Daily,
+            Device = DeviceType.Desktop,
+            Country = "ID",
+            Count = 5
+        });
+        var ctrl = NewController(_owner);
+
+        var result = await ctrl.Analytics(link.Id, default);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<AnalyticsSummary>(ok.Value);
+        Assert.Equal(link.Id, body.LinkId);
+        Assert.Equal(5L, body.TotalClicks);
+    }
+
+    [Fact]
+    public async Task Analytics_AsNonOwner_ReturnsNotFound()
+    {
+        var link = await SeedLink(_owner);
+        var ctrl = NewController(_other);
+
+        var result = await ctrl.Analytics(link.Id, default);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Analytics_UnknownLink_ReturnsNotFound()
+    {
+        var ctrl = NewController(_owner);
+        var result = await ctrl.Analytics(Guid.NewGuid(), default);
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    private sealed class FakeClickRepository : IClickRepository
+    {
+        public List<ClickAggregate> Aggregates { get; } = new();
+
+        public Task AddAsync(Click click, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task AddRangeAsync(IEnumerable<Click> clicks, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
+            => Task.FromResult(Aggregates.Where(a => a.ShortenedUrlId == shortenedUrlId).ToList());
     }
 }

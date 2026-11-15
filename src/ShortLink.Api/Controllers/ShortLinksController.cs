@@ -74,6 +74,15 @@ public sealed class ShortLinksController : ControllerBase
         }
     }
 
+    [HttpGet("{id:guid}/analytics")]
+    [ProducesResponseType<AnalyticsSummary>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AnalyticsSummary>> Analytics(Guid id, CancellationToken ct)
+    {
+        var summary = await _service.GetAnalyticsAsync(CurrentUserId(), id, ct);
+        return summary is null ? NotFound() : Ok(summary);
+    }
+
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

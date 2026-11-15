@@ -10,17 +10,20 @@ public sealed class ShortLinkService
     private readonly ISlugGenerator _slugGenerator;
     private readonly IUrlValidator _urlValidator;
     private readonly IClock _clock;
+    private readonly IClickRepository _clickRepository;
 
     public ShortLinkService(
         IShortLinkRepository repository,
         ISlugGenerator slugGenerator,
         IUrlValidator urlValidator,
-        IClock clock)
+        IClock clock,
+        IClickRepository clickRepository)
     {
         _repository = repository;
         _slugGenerator = slugGenerator;
         _urlValidator = urlValidator;
         _clock = clock;
+        _clickRepository = clickRepository;
     }
 
     public async Task<ShortenedUrl> CreateAsync(
@@ -128,6 +131,34 @@ public sealed class ShortLinkService
             .OrderBy(a => a.PeriodStart)
             .ThenBy(a => a.Device)
             .ToList();
+    }
+
+    /// <summary>Ringkasan analytics untuk satu link milik owner (null bila bukan owner / tak ditemukan).</summary>
+    public async Task<AnalyticsSummary?> GetAnalyticsAsync(Guid ownerId, Guid linkId, CancellationToken ct = default)
+    {
+        var link = await _repository.GetByIdAsync(linkId, ct);
+        if (link is null || link.OwnerId != ownerId)
+            return null;
+
+        var aggregates = await _clickRepository.GetByShortLinkIdAsync(linkId, ct);
+        var daily = aggregates.Where(a => a.Period == AggregatePeriod.Daily).ToList();
+
+        return new AnalyticsSummary(
+            linkId,
+            daily.Sum(a => a.Count),
+            daily.GroupBy(a => a.Device ?? DeviceType.Other)
+                .Select(g => new DeviceStat(g.Key.ToString(), g.Sum(a => a.Count)))
+                .OrderByDescending(x => x.Count)
+                .ToList(),
+            daily.Where(a => a.Country is not null)
+                .GroupBy(a => a.Country!)
+                .Select(g => new CountryStat(g.Key, g.Sum(a => a.Count)))
+                .OrderByDescending(x => x.Count)
+                .ToList(),
+            daily.GroupBy(a => a.PeriodStart)
+                .Select(g => new DayStat(g.Key, g.Sum(a => a.Count)))
+                .OrderBy(x => x.Day)
+                .ToList());
     }
 
     private static DateTimeOffset Bucket(DateTimeOffset time, AggregatePeriod period)
