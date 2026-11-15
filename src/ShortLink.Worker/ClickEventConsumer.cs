@@ -1,23 +1,26 @@
 using System.Text.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using ShortLink.Core;
 using ShortLink.Core.Events;
 using ShortLink.Infrastructure.Messaging;
 
 namespace ShortLink.Worker;
 
 /// <summary>
-/// HintergrundService yang mengonsumsi pesan klik dari RabbitMQ.
-/// Pada P2.5 baru log (persist ke DB ada di P4.1).
+/// BackgroundService yang mengonsumsi pesan klik dari RabbitMQ.
+/// Mempersist setiap event klik ke tabel `clicks` via ClickIngestionService (P4.1).
 /// </summary>
 public sealed class ClickEventConsumer : BackgroundService
 {
     private readonly ILogger<ClickEventConsumer> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly string _connectionString;
 
-    public ClickEventConsumer(ILogger<ClickEventConsumer> logger, IConfiguration config)
+    public ClickEventConsumer(ILogger<ClickEventConsumer> logger, IServiceScopeFactory scopeFactory, IConfiguration config)
     {
         _logger = logger;
+        _scopeFactory = scopeFactory;
         _connectionString = config["RabbitMQ:ConnectionString"]
             ?? throw new InvalidOperationException("RabbitMQ:ConnectionString tidak ditemukan");
     }
@@ -37,8 +40,21 @@ public sealed class ClickEventConsumer : BackgroundService
             try
             {
                 var clickEvent = JsonSerializer.Deserialize<ClickEvent>(ea.Body.Span);
-                _logger.LogInformation("Click event diterima: {ShortenedUrlId} pada {OccurredAt} (device {Device})",
-                    clickEvent?.ShortenedUrlId, clickEvent?.OccurredAt, clickEvent?.Device);
+                if (clickEvent is null)
+                {
+                    _logger.LogWarning("Event klik null/tidak valid; NACK tanpa requeue");
+                    await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+                    return;
+                }
+
+                await using (var scope = _scopeFactory.CreateAsyncScope())
+                {
+                    var ingestion = scope.ServiceProvider.GetRequiredService<ClickIngestionService>();
+                    await ingestion.PersistAsync(clickEvent, stoppingToken);
+                }
+
+                _logger.LogInformation("Click event dipersist: {ShortenedUrlId} pada {OccurredAt} (device {Device})",
+                    clickEvent.ShortenedUrlId, clickEvent.OccurredAt, clickEvent.Device);
                 await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
             }
             catch (Exception ex)
