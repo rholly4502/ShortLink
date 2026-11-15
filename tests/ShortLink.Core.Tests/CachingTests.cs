@@ -217,6 +217,17 @@ public sealed class FakeRedisStringStore : IRedisStringStore
         Values[key] = value;
         return Task.CompletedTask;
     }
+
+    public Dictionary<string, long> Counts { get; } = new();
+    public List<(string Key, TimeSpan Ttl)> Increments { get; } = new();
+
+    public Task<long> IncrementAsync(string key, TimeSpan ttl, CancellationToken ct = default)
+    {
+        Increments.Add((key, ttl));
+        var next = Counts.TryGetValue(key, out var c) ? c + 1 : 1;
+        Counts[key] = next;
+        return Task.FromResult(next);
+    }
 }
 
 public sealed class FakeSlugCache : ISlugCache

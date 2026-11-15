@@ -21,5 +21,22 @@ public sealed class RedisStringStore : IRedisStringStore, IAsyncDisposable
     public Task SetAsync(string key, string value, TimeSpan ttl, CancellationToken ct = default)
         => _mux.GetDatabase().StringSetAsync(key, value, ttl);
 
+    private const string IncrementScript =
+        "local current = redis.call('INCR', KEYS[1])\n" +
+        "if current == 1 then\n" +
+        "  redis.call('EXPIRE', KEYS[1], ARGV[1])\n" +
+        "end\n" +
+        "return current\n";
+
+    public async Task<long> IncrementAsync(string key, TimeSpan ttl, CancellationToken ct = default)
+    {
+        var db = _mux.GetDatabase();
+        var result = await db.ScriptEvaluateAsync(
+            IncrementScript,
+            new RedisKey[] { key },
+            new RedisValue[] { (int)ttl.TotalSeconds });
+        return (long)result;
+    }
+
     public ValueTask DisposeAsync() => _mux.DisposeAsync();
 }

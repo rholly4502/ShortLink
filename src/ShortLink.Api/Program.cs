@@ -5,6 +5,7 @@ using ShortLink.Core;
 using ShortLink.Core.Abstractions;
 using ShortLink.Infrastructure.Caching;
 using ShortLink.Infrastructure.Messaging;
+using ShortLink.Api.Middleware;
 using ShortLink.Infrastructure.Persistence;
 using ShortLink.Infrastructure.Security;
 
@@ -49,6 +50,11 @@ builder.Services.AddSingleton<CachedSlugResolver>(sp =>
         sp.GetRequiredService<IClock>(),
         TimeSpan.FromHours(12)));
 
+// Rate limit (Redis fixed-window)
+var rateLimit = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>() ?? new RateLimitOptions();
+builder.Services.AddSingleton(rateLimit);
+builder.Services.AddSingleton<FixedWindowRateLimiter>();
+
 // RabbitMQ click publisher
 var amqp = builder.Configuration["RabbitMQ:ConnectionString"];
 builder.Services.AddSingleton<IMessagePublisher>(_ =>
@@ -68,6 +74,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseMiddleware<RedisRateLimitMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

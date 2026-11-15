@@ -122,7 +122,7 @@
   {
     "id": "P3.5",
     "title": "Rate-limit middleware (Redis)",
-    "status": "pending",
+    "status": "done",
     "phase": "P3"
   },
   {
@@ -133,7 +133,7 @@
   },
   {
     "id": "P4.1",
-    "title": "Konsumsi event klik → persist clicks",
+    "title": "Konsumsi event klik \u2192 persist clicks",
     "status": "pending",
     "phase": "P4"
   },
