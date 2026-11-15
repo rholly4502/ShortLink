@@ -133,7 +133,7 @@
   },
   {
     "id": "P4.1",
-    "title": "Konsumsi event klik \u2192 persist clicks",
+    "title": "Konsumsi event klik → persist clicks",
     "status": "done",
     "phase": "P4"
   },
@@ -146,8 +146,9 @@
   {
     "id": "P5.1",
     "title": "Uji keamanan (open-redirect, rate-limit, auth)",
-    "status": "pending",
-    "phase": "P5"
+    "status": "done",
+    "phase": "P5",
+    "completed_at": "2026-11-15"
   },
   {
     "id": "P5.2",
