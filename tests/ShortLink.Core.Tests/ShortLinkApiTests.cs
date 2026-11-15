@@ -394,7 +394,12 @@ public class ShortLinkApiTests
 
         public Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default) => Task.CompletedTask;
 
-        public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
+        public Task UpsertAggregatesAsync(IEnumerable<ClickAggregate> aggregates, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
             => Task.FromResult(Aggregates.Where(a => a.ShortenedUrlId == shortenedUrlId).ToList());
     }
 }

@@ -11,4 +11,7 @@ public interface IClickRepository
     Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default);
 
     Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default);
+
+    /// <summary>Upsert agregasi: increment row eksisting (sesuai key unik) atau insert baru.</summary>
+    Task UpsertAggregatesAsync(IEnumerable<ClickAggregate> aggregates, CancellationToken ct = default);
 }

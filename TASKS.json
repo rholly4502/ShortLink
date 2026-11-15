@@ -133,14 +133,14 @@
   },
   {
     "id": "P4.1",
-    "title": "Konsumsi event klik → persist clicks",
+    "title": "Konsumsi event klik \u2192 persist clicks",
     "status": "done",
     "phase": "P4"
   },
   {
     "id": "P4.2",
     "title": "Agregasi per jam/hari/device/country",
-    "status": "pending",
+    "status": "done",
     "phase": "P4"
   },
   {

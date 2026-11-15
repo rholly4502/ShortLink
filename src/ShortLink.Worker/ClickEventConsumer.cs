@@ -50,7 +50,10 @@ public sealed class ClickEventConsumer : BackgroundService
                 await using (var scope = _scopeFactory.CreateAsyncScope())
                 {
                     var ingestion = scope.ServiceProvider.GetRequiredService<ClickIngestionService>();
-                    await ingestion.PersistAsync(clickEvent, stoppingToken);
+                    var click = await ingestion.PersistAsync(clickEvent, stoppingToken);
+
+                    var aggregation = scope.ServiceProvider.GetRequiredService<ClickAggregationService>();
+                    await aggregation.AggregateAsync(new[] { click }, stoppingToken);
                 }
 
                 _logger.LogInformation("Click event dipersist: {ShortenedUrlId} pada {OccurredAt} (device {Device})",

@@ -90,7 +90,12 @@ public class ServiceExpiryTests
         public Task AddAsync(Click click, CancellationToken ct = default) => Task.CompletedTask;
         public Task AddRangeAsync(IEnumerable<Click> clicks, CancellationToken ct = default) => Task.CompletedTask;
         public Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default) => Task.CompletedTask;
-        public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
+        public Task UpsertAggregatesAsync(IEnumerable<ClickAggregate> aggregates, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
             => Task.FromResult(new List<ClickAggregate>());
     }
 }

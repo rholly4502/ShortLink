@@ -124,14 +124,15 @@ public sealed class ShortLinkService
 
         return clicks
             .Where(c => c.ClickedAt != default)
-            .GroupBy(c => (Bucket(c.ClickedAt, period), c.Device, c.Country))
+            .GroupBy(c => (c.ShortenedUrlId, Bucket(c.ClickedAt, period), c.Device, c.Country))
             .Select(g => new ClickAggregate
             {
                 Id = Guid.NewGuid(),
-                PeriodStart = g.Key.Item1,
+                ShortenedUrlId = g.Key.Item1,
+                PeriodStart = g.Key.Item2,
                 Period = period,
-                Device = g.Key.Item2,
-                Country = g.Key.Item3,
+                Device = g.Key.Item3,
+                Country = g.Key.Item4,
                 Count = g.LongCount()
             })
             .OrderBy(a => a.PeriodStart)

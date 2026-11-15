@@ -14,7 +14,7 @@ public sealed class ClickIngestionService
 
     public ClickIngestionService(IClickRepository clicks) => _clicks = clicks;
 
-    public async Task PersistAsync(ClickEvent evt, CancellationToken ct = default)
+    public async Task<Click> PersistAsync(ClickEvent evt, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(evt);
 
@@ -33,5 +33,6 @@ public sealed class ClickIngestionService
         };
 
         await _clicks.AddAsync(click, ct);
+        return click;
     }
 }

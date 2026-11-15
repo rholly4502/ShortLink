@@ -328,6 +328,44 @@ public class ShortLinkServiceTests
         Assert.Null(await _sut.GetAnalyticsAsync(_owner, Guid.NewGuid()));
     }
 
+
+    [Fact]
+    public void AggregateClicks_SetsShortenedUrlId_OnAggregates()
+    {
+        var linkId = Guid.NewGuid();
+        var clicks = new[]
+        {
+            MakeClick(new DateTimeOffset(2026, 11, 14, 10, 10, 0, TimeSpan.Zero), DeviceType.Desktop, null),
+            MakeClick(new DateTimeOffset(2026, 11, 14, 10, 50, 0, TimeSpan.Zero), DeviceType.Desktop, null),
+        };
+        foreach (var c in clicks) c.ShortenedUrlId = linkId;
+
+        var aggregates = ShortLinkService.AggregateClicks(clicks, AggregatePeriod.Hourly);
+
+        Assert.All(aggregates, a => Assert.Equal(linkId, a.ShortenedUrlId));
+    }
+
+    [Fact]
+    public void AggregateClicks_GroupsSeparatelyByShortenedUrlId()
+    {
+        var linkA = Guid.NewGuid();
+        var linkB = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 14, 10, 10, 0, TimeSpan.Zero);
+        var clicks = new[]
+        {
+            MakeClick(at, DeviceType.Desktop, "ID"),
+            MakeClick(at, DeviceType.Desktop, "ID"),
+        };
+        clicks[0].ShortenedUrlId = linkA;
+        clicks[1].ShortenedUrlId = linkB;
+
+        var aggregates = ShortLinkService.AggregateClicks(clicks, AggregatePeriod.Daily);
+
+        Assert.Equal(2, aggregates.Count);
+        Assert.Equal(1L, aggregates.Single(a => a.ShortenedUrlId == linkA).Count);
+        Assert.Equal(1L, aggregates.Single(a => a.ShortenedUrlId == linkB).Count);
+    }
+
     private sealed class FakeClickRepository : IClickRepository
     {
         public List<ClickAggregate> Aggregates { get; } = new();
@@ -338,7 +376,14 @@ public class ShortLinkServiceTests
 
         public Task AddAggregateAsync(ClickAggregate aggregate, CancellationToken ct = default) => Task.CompletedTask;
 
-        public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
+        public Task UpsertAggregatesAsync(IEnumerable<ClickAggregate> aggregates, CancellationToken ct = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<List<ClickAggregate>> GetByShortLinkIdAsync(Guid shortenedUrlId, CancellationToken ct = default)
             => Task.FromResult(Aggregates.Where(a => a.ShortenedUrlId == shortenedUrlId).ToList());
+
+
     }
 }
