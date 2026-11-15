@@ -28,7 +28,7 @@ public sealed class JwtTokenService : IAuthTokenService
         var access = WriteToken(user, AccessTokenType, now, accessExp);
         var refresh = WriteToken(user, RefreshTokenType, now, refreshExp);
 
-        return new TokenPair(access, refresh, accessExp, refreshExp);
+        return new TokenPair(access, refresh, accessExp, refreshExp, user.Id, user.Username, user.Email, user.Role.ToString());
     }
 
     public Guid? ValidateRefreshToken(string refreshToken)

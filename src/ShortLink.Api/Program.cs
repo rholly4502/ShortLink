@@ -43,7 +43,7 @@ var redisCs = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379
 builder.Services.AddSingleton<IRedisStringStore>(_ => new RedisStringStore(redisCs));
 builder.Services.AddSingleton<ISlugCache>(sp =>
     new RedisSlugCache(sp.GetRequiredService<IRedisStringStore>(), TimeSpan.FromHours(12)));
-builder.Services.AddSingleton<CachedSlugResolver>(sp =>
+builder.Services.AddScoped<CachedSlugResolver>(sp =>
     new CachedSlugResolver(
         sp.GetRequiredService<ISlugCache>(),
         sp.GetRequiredService<IShortLinkRepository>(),

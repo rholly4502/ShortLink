@@ -42,7 +42,7 @@ public sealed class AuthServiceTests
         public TokenPair Generate(User user)
         {
             LastUser = user;
-            return new TokenPair("access-token", "refresh-token", DateTimeOffset.UtcNow.AddMinutes(15), DateTimeOffset.UtcNow.AddDays(7));
+            return new TokenPair("access-token", "refresh-token", DateTimeOffset.UtcNow.AddMinutes(15), DateTimeOffset.UtcNow.AddDays(7), user.Id, user.Username, user.Email, user.Role.ToString());
         }
         public Guid? ValidateRefreshToken(string refreshToken)
             => refreshToken == "valid-refresh" ? ValidUserId : null;

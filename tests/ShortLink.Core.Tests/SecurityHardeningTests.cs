@@ -120,7 +120,7 @@ public sealed class SecurityHardeningTests
     private ShortLinksController NewController(params Claim[] claims)
     {
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
-        return new ShortLinksController(_service)
+        return new ShortLinksController(_service, new FakeSlugCache())
         {
             ControllerContext = new ControllerContext
             {

@@ -21,7 +21,7 @@ public sealed class RedirectController : ControllerBase
         _clock = clock;
     }
 
-    [HttpGet("{slug:regex(^[a-zA-Z0-9]+$)}")]
+    [HttpGet("{slug:regex(^[[a-zA-Z0-9]]+$)}")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RedirectTo(string slug, CancellationToken ct)

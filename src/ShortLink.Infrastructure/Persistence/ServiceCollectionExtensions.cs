@@ -28,6 +28,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthTokenService, JwtTokenService>();
         services.AddScoped<AuthService>();
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<ISlugGenerator, SlugGenerator>();
+        services.AddSingleton<IUrlValidator, UrlValidator>();
+        services.AddScoped<ShortLinkService>();
 
         return services;
     }

@@ -228,6 +228,9 @@ public sealed class FakeRedisStringStore : IRedisStringStore
         Counts[key] = next;
         return Task.FromResult(next);
     }
+
+    public Task<bool> DeleteAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(Values.Remove(key));
 }
 
 public sealed class FakeSlugCache : ISlugCache
@@ -240,6 +243,12 @@ public sealed class FakeSlugCache : ISlugCache
     public Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default)
     {
         Links[slug] = link;
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(string slug, CancellationToken ct = default)
+    {
+        Links.Remove(slug);
         return Task.CompletedTask;
     }
 }

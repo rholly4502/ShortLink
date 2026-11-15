@@ -8,4 +8,6 @@ public interface ISlugCache
     Task<ShortenedUrl?> GetAsync(string slug, CancellationToken ct = default);
 
     Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default);
+
+    Task RemoveAsync(string slug, CancellationToken ct = default);
 }

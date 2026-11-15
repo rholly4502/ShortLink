@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using ShortLink.Api.Errors;
 using ShortLink.Api.Models;
 using ShortLink.Core;
+using ShortLink.Core.Abstractions;
 using ShortLink.Core.Entities;
 
 namespace ShortLink.Api.Controllers;
@@ -14,8 +15,13 @@ namespace ShortLink.Api.Controllers;
 public sealed class ShortLinksController : ControllerBase
 {
     private readonly ShortLinkService _service;
+    private readonly ISlugCache _slugCache;
 
-    public ShortLinksController(ShortLinkService service) => _service = service;
+    public ShortLinksController(ShortLinkService service, ISlugCache slugCache)
+    {
+        _service = service;
+        _slugCache = slugCache;
+    }
 
     [HttpPost]
     [ProducesResponseType<LinkResponse>(StatusCodes.Status201Created)]
@@ -59,6 +65,7 @@ public sealed class ShortLinksController : ControllerBase
         try
         {
             var link = await _service.UpdateUrlAsync(CurrentUserId(), id, request.Url, request.ExpiresAt, ct);
+            await _slugCache.RemoveAsync(link.Slug, ct);
             return Ok(ToResponse(link));
         }
         catch (Exception ex)
@@ -83,7 +90,11 @@ public sealed class ShortLinksController : ControllerBase
     {
         try
         {
+            var link = await _service.GetForOwnerAsync(CurrentUserId(), id, ct);
+            if (link is null)
+                return NotFound();
             await _service.DeleteByOwnerAsync(CurrentUserId(), id, ct);
+            await _slugCache.RemoveAsync(link.Slug, ct);
             return NoContent();
         }
         catch (Exception ex)

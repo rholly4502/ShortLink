@@ -38,5 +38,8 @@ public sealed class RedisSlugCache : ISlugCache
         return _store.SetAsync(Key(slug), raw, ttl ?? _defaultTtl, ct);
     }
 
+    public Task RemoveAsync(string slug, CancellationToken ct = default)
+        => _store.DeleteAsync(Key(slug), ct);
+
     private static string Key(string slug) => "slug:" + slug;
 }

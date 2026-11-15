@@ -34,7 +34,7 @@ public class ShortLinkApiTests
     {
         var claims = new[] { new Claim(ClaimTypes.NameIdentifier, caller.ToString()) };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
-        return new ShortLinksController(_service)
+        return new ShortLinksController(_service, new FakeSlugCache())
         {
             ControllerContext = new ControllerContext
             {

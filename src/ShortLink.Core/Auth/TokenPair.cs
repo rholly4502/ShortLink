@@ -5,4 +5,8 @@ public sealed record TokenPair(
     string AccessToken,
     string RefreshToken,
     DateTimeOffset AccessExpiresAt,
-    DateTimeOffset RefreshExpiresAt);
+    DateTimeOffset RefreshExpiresAt,
+    Guid UserId,
+    string Username,
+    string Email,
+    string Role);

@@ -3,16 +3,16 @@ using System.ComponentModel.DataAnnotations;
 namespace ShortLink.Api.Models;
 
 public sealed record RegisterRequest(
-    [property: Required, StringLength(50, MinimumLength = 3)] string Username,
-    [property: Required, EmailAddress, StringLength(254)] string Email,
-    [property: Required, StringLength(128, MinimumLength = 8)] string Password);
+    [Required, StringLength(50, MinimumLength = 3)] string Username,
+    [Required, EmailAddress, StringLength(254)] string Email,
+    [Required, StringLength(128, MinimumLength = 8)] string Password);
 
 public sealed record LoginRequest(
-    [property: Required, StringLength(254)] string Identifier,
-    [property: Required] string Password);
+    [Required, StringLength(254)] string Identifier,
+    [Required] string Password);
 
 public sealed record RefreshRequest(
-    [property: Required] string RefreshToken);
+    [Required] string RefreshToken);
 
 public sealed record UserResponse(Guid Id, string Username, string Email, string Role);
 

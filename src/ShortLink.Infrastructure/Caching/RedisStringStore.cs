@@ -21,6 +21,9 @@ public sealed class RedisStringStore : IRedisStringStore, IAsyncDisposable
     public Task SetAsync(string key, string value, TimeSpan ttl, CancellationToken ct = default)
         => _mux.GetDatabase().StringSetAsync(key, value, ttl);
 
+    public Task<bool> DeleteAsync(string key, CancellationToken ct = default)
+        => _mux.GetDatabase().KeyDeleteAsync(key);
+
     private const string IncrementScript =
         "local current = redis.call('INCR', KEYS[1])\n" +
         "if current == 1 then\n" +

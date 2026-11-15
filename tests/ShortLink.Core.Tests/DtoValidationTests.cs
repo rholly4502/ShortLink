@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using ShortLink.Api.Models;
 
 namespace ShortLink.Core.Tests;
@@ -7,8 +8,22 @@ public class DtoValidationTests
 {
     private static bool IsValid(object dto)
     {
+        var type = dto.GetType();
+        var ctor = type.GetConstructors().Single();
         var results = new List<ValidationResult>();
-        return Validator.TryValidateObject(dto, new ValidationContext(dto), results, validateAllProperties: true);
+        foreach (var parameter in ctor.GetParameters())
+        {
+            var value = type.GetProperty(parameter.Name!)!.GetValue(dto);
+            var attributes = parameter.GetCustomAttributes(true).OfType<ValidationAttribute>();
+            var ok = Validator.TryValidateValue(
+                value ?? string.Empty,
+                new ValidationContext(dto) { MemberName = parameter.Name },
+                results,
+                attributes);
+            if (!ok)
+                return false;
+        }
+        return true;
     }
 
     // --- Register ---

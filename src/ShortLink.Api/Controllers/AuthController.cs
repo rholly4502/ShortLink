@@ -60,8 +60,8 @@ public sealed class AuthController : ControllerBase
         pair.AccessToken,
         pair.RefreshToken,
         pair.AccessExpiresAt,
-        Guid.Empty,
-        string.Empty,
-        string.Empty,
-        string.Empty);
+        pair.UserId,
+        pair.Username,
+        pair.Email,
+        pair.Role);
 }

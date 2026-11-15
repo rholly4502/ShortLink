@@ -9,6 +9,8 @@ public interface IRedisStringStore
 
     Task SetAsync(string key, string value, TimeSpan ttl, CancellationToken ct = default);
 
+    Task<bool> DeleteAsync(string key, CancellationToken ct = default);
+
     /// <summary>Atomic INCR; set EXPIRE saat pertama kali (kembali 1). Menghasilkan count baru.</summary>
     Task<long> IncrementAsync(string key, TimeSpan ttl, CancellationToken ct = default);
 }
