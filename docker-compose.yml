@@ -47,7 +47,40 @@ services:
       timeout: 10s
       retries: 12
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shortlink-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Redis__ConnectionString: redis:6379,password=${REDIS_PASSWORD}
+      RabbitMQ__ConnectionString: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      Jwt__Issuer: shortlink
+      Jwt__Audience: shortlink-api
+      AdminSeed__Username: ${ADMIN_SEED_USERNAME}
+      AdminSeed__Email: ${ADMIN_SEED_EMAIL}
+      AdminSeed__Password: ${ADMIN_SEED_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - default
+      - shared_bridge
+
 volumes:
   pgdata:
   redisdata:
   rabbitmqdata:
+
+networks:
+  shared_bridge:
+    name: ${SHARED_NETWORK:-shared_bridge}
+    external: true
