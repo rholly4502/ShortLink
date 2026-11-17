@@ -1,0 +1,40 @@
+name: Deploy ShortLink
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          REMOTE_SCRIPT: |
+            set -euo pipefail
+            docker network inspect shared_bridge >/dev/null 2>&1 || docker network create shared_bridge
+            cd /opt/ShortLink
+            git fetch --prune origin main && git reset --hard origin/main
+            git clean -fd
+            [ -f .env ] || cp .env.example .env
+            docker compose up -d --build
+            sleep 6
+            docker compose ps
+            curl -s -o /dev/null -w "shortlink_http=%{http_code}\n" http://localhost:8080/api/health || echo "health check failed"
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          PORT="${VPS_PORT:-22}"
+          printf '%s\n' "$REMOTE_SCRIPT" | ssh \
+            -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile=/dev/null \
+            -o ConnectTimeout=20 -p "$PORT" \
+            "${VPS_USER}@${VPS_HOST}" 'bash -s'
