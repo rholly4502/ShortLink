@@ -201,7 +201,8 @@
   {
     "id": "P6.5",
     "title": "Integrasi static serving ke Api + Dockerfile multi-stage + update DEPLOY.md",
-    "status": "pending",
-    "phase": "P6"
+    "status": "done",
+    "phase": "P6",
+    "completed_at": "2026-11-18"
   }
 ]

@@ -6,3 +6,4 @@ appsettings.Development.json
 .env
 *.sqlite
 data/
+src/ShortLink.Api/wwwroot/

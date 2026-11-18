@@ -77,6 +77,15 @@ app.UseHttpsRedirection();
 app.UseMiddleware<RedisRateLimitMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 app.MapControllers();
+app.MapFallbackToFile("index.html");
 
 app.Run();
+
+// Entry point yang dibuka utk WebApplicationFactory (integration tests).
+public partial class Program { }
