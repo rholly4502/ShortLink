@@ -133,7 +133,7 @@
  },
  {
   "id": "P4.1",
-  "title": "Konsumsi event klik → persist clicks",
+  "title": "Konsumsi event klik \u2192 persist clicks",
   "status": "done",
   "phase": "P4"
  },
@@ -169,5 +169,35 @@
   "title": "Uji end-to-end manual",
   "status": "done",
   "phase": "P5"
+ },
+ {
+  "id": "P6.1",
+  "title": "Scaffold frontend React/Vite (base=/shortlink/, basename, api client)",
+  "status": "pending",
+  "phase": "P6"
+ },
+ {
+  "id": "P6.2",
+  "title": "Halaman Login/Register hooking AuthController (/api/auth/*)",
+  "status": "pending",
+  "phase": "P6"
+ },
+ {
+  "id": "P6.3",
+  "title": "Halaman kelola short link: create/list/update/delete (ShortLinksController)",
+  "status": "pending",
+  "phase": "P6"
+ },
+ {
+  "id": "P6.4",
+  "title": "Halaman analytics per link (klik, device, country, chart)",
+  "status": "pending",
+  "phase": "P6"
+ },
+ {
+  "id": "P6.5",
+  "title": "Integrasi static serving ke Api + Dockerfile multi-stage + update DEPLOY.md",
+  "status": "pending",
+  "phase": "P6"
  }
 ]
