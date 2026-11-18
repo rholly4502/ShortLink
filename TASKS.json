@@ -133,7 +133,7 @@
  },
  {
   "id": "P4.1",
-  "title": "Konsumsi event klik \u2192 persist clicks",
+  "title": "Konsumsi event klik → persist clicks",
   "status": "done",
   "phase": "P4"
  },
@@ -173,8 +173,9 @@
  {
   "id": "P6.1",
   "title": "Scaffold frontend React/Vite (base=/shortlink/, basename, api client)",
-  "status": "pending",
-  "phase": "P6"
+  "status": "done",
+  "phase": "P6",
+  "completed_at": "2026-11-18"
  },
  {
   "id": "P6.2",
