@@ -194,8 +194,9 @@
   {
     "id": "P6.4",
     "title": "Halaman analytics per link (klik, device, country, chart)",
-    "status": "pending",
-    "phase": "P6"
+    "status": "done",
+    "phase": "P6",
+    "completed_at": "2026-11-18"
   },
   {
     "id": "P6.5",

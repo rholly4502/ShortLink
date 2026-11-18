@@ -54,6 +54,7 @@ function renderPage(client: ApiClient, authenticated = true) {
     <MemoryRouter initialEntries={['/links']}>
       <Routes>
         <Route path="/links" element={<LinksPage client={client} />} />
+        <Route path="/links/:id/analytics" element={<div>Analytics Page</div>} />
         <Route path="/login" element={<div>Login Page</div>} />
       </Routes>
     </MemoryRouter>,
@@ -111,5 +112,15 @@ describe('LinksPage', () => {
 
     expect(linksApi.update).toHaveBeenCalledWith('l1', { url: 'https://baru.io', expiresAt: null })
     expect(await screen.findByText('https://baru.io')).toBeTruthy()
+  })
+
+  it('membuka halaman analytics saat tombol Analytics diklik', async () => {
+    const { client } = makeClient([makeLink({ id: 'l1', slug: 'abc' })])
+    renderPage(client)
+
+    await screen.findByText('https://example.io')
+    await userEvent.click(screen.getByRole('button', { name: /analytics/i }))
+
+    expect(screen.getByText('Analytics Page')).toBeTruthy()
   })
 })

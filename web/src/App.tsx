@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import LinksPage from './pages/LinksPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/links" element={<LinksPage />} />
+      <Route path="/links/:id/analytics" element={<AnalyticsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

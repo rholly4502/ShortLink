@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { ApiError, createApiClient } from '../api/client'
 import type { ApiClient } from '../api/client'
 import type { LinkResponse } from '../api/types'
@@ -19,6 +19,7 @@ function toLocalInput(iso: string | null): string {
 }
 
 export default function LinksPage({ client = defaultClient }: { client?: ApiClient }) {
+  const navigate = useNavigate()
   const [links, setLinks] = useState<LinkResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -144,6 +145,7 @@ export default function LinksPage({ client = defaultClient }: { client?: ApiClie
                     </span>
                   </div>
                   <div className="row-actions">
+                    <button type="button" onClick={() => navigate(`/links/${link.id}/analytics`)}>Analytics</button>
                     <button type="button" onClick={() => startEdit(link)}>Edit</button>
                     <button type="button" onClick={() => onDelete(link.id)}>Hapus</button>
                   </div>
