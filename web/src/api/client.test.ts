@@ -104,3 +104,19 @@ describe('api client', () => {
     expect(init.method).toBe('DELETE')
   })
 })
+
+describe('isAuthenticated', () => {
+  it('returns false when no access token is stored', () => {
+    const client = createApiClient({
+      storage: { getAccessToken: () => null, setTokens: vi.fn(), clear: vi.fn() },
+    })
+    expect(client.isAuthenticated()).toBe(false)
+  })
+
+  it('returns true when an access token is stored', () => {
+    const client = createApiClient({
+      storage: { getAccessToken: () => 'token', setTokens: vi.fn(), clear: vi.fn() },
+    })
+    expect(client.isAuthenticated()).toBe(true)
+  })
+})

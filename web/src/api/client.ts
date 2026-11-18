@@ -65,6 +65,8 @@ export interface ApiClient {
     remove(id: string): Promise<void>
     analytics(id: string): Promise<AnalyticsSummary>
   }
+  /** True when an access token is stored. */
+  isAuthenticated(): boolean
 }
 
 export interface CreateApiClientOptions {
@@ -139,5 +141,6 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
       remove: (id) => request(`/api/links/${id}`, { method: 'DELETE' }),
       analytics: (id) => request(`/api/links/${id}/analytics`),
     },
+    isAuthenticated: () => storage.getAccessToken() !== null,
   }
 }

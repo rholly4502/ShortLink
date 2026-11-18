@@ -187,8 +187,9 @@
   {
     "id": "P6.3",
     "title": "Halaman kelola short link: create/list/update/delete (ShortLinksController)",
-    "status": "pending",
-    "phase": "P6"
+    "status": "done",
+    "phase": "P6",
+    "completed_at": "2026-11-18"
   },
   {
     "id": "P6.4",

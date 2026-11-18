@@ -161,3 +161,61 @@ code {
   padding: 8px 10px;
 }
 .auth-switch { font-size: 14px; margin-top: 8px; }
+
+/* Links management page */
+.links-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: left;
+}
+.links-page .auth-card { width: 560px; }
+.home-nav {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 12px;
+}
+.home-nav a { color: var(--accent); }
+.link-list {
+  list-style: none;
+  width: 100%;
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+}
+.link-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.link-slug { font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.link-url { color: var(--text-h); overflow-wrap: anywhere; }
+.link-meta { font-size: 13px; }
+.row-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.row-actions button {
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+}
+.row-actions button:hover { background: var(--accent); color: #fff; }
+.edit-form { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.edit-form label { font-size: 13px; font-weight: 600; color: var(--text-h); }
+.edit-form input { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-h); }
