@@ -32,6 +32,9 @@ public sealed class ShortLinkService
         DateTimeOffset? expiresAt = null,
         CancellationToken ct = default)
     {
+        if (ownerId == Guid.Empty)
+            throw new ArgumentException("OwnerId tidak valid.", nameof(ownerId));
+
         if (!_urlValidator.TryNormalize(url, out var normalized))
             throw new ArgumentException("URL tidak valid atau tidak aman.", nameof(url));
 
@@ -75,10 +78,13 @@ public sealed class ShortLinkService
     }
 
     public async Task<List<ShortenedUrl>> ListForOwnerAsync(Guid ownerId, CancellationToken ct = default)
-        => await _repository.GetByOwnerAsync(ownerId, ct);
+        => ownerId == Guid.Empty ? new List<ShortenedUrl>() : await _repository.GetByOwnerAsync(ownerId, ct);
 
     public async Task<ShortenedUrl?> GetForOwnerAsync(Guid ownerId, Guid id, CancellationToken ct = default)
     {
+        if (ownerId == Guid.Empty)
+            return null;
+
         var link = await _repository.GetByIdAsync(id, ct);
         return link is not null && link.OwnerId == ownerId ? link : null;
     }
@@ -90,6 +96,9 @@ public sealed class ShortLinkService
         DateTimeOffset? expiresAt,
         CancellationToken ct = default)
     {
+        if (ownerId == Guid.Empty)
+            throw new UnauthorizedAccessException();
+
         if (!_urlValidator.TryNormalize(url, out var normalized))
             throw new ArgumentException("URL tidak valid atau tidak aman.", nameof(url));
 
@@ -109,6 +118,9 @@ public sealed class ShortLinkService
 
     public async Task DeleteByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct = default)
     {
+        if (ownerId == Guid.Empty)
+            throw new UnauthorizedAccessException();
+
         var link = await _repository.GetByIdAsync(id, ct)
             ?? throw new KeyNotFoundException("Short link tidak ditemukan.");
         if (link.OwnerId != ownerId)
@@ -143,6 +155,9 @@ public sealed class ShortLinkService
     /// <summary>Ringkasan analytics untuk satu link milik owner (null bila bukan owner / tak ditemukan).</summary>
     public async Task<AnalyticsSummary?> GetAnalyticsAsync(Guid ownerId, Guid linkId, CancellationToken ct = default)
     {
+        if (ownerId == Guid.Empty)
+            return null;
+
         var link = await _repository.GetByIdAsync(linkId, ct);
         if (link is null || link.OwnerId != ownerId)
             return null;

@@ -114,6 +114,45 @@ public sealed class SecurityHardeningTests
         Assert.Equal(link.Id, Assert.IsType<LinkResponse>(ok.Value).Id);
     }
 
+    [Fact]
+    public async Task Create_InvalidIdentity_ReturnsUnauthorized_AndDoesNotPersist()
+    {
+        var noClaimsCtrl = NewController();
+        var noClaimsResult = await noClaimsCtrl.Create(new CreateLinkRequest("https://example.com", null), default);
+        Assert.IsType<UnauthorizedResult>(noClaimsResult.Result);
+
+        var emptySubCtrl = NewController(new Claim("sub", Guid.Empty.ToString()));
+        var emptySubResult = await emptySubCtrl.Create(new CreateLinkRequest("https://example.com", null), default);
+        Assert.IsType<UnauthorizedResult>(emptySubResult.Result);
+
+        Assert.Empty(_repo.ById);
+    }
+
+    [Fact]
+    public async Task Service_EmptyOwnerId_CannotCreateOrAccessEmptyOwnedLinks()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.CreateAsync(Guid.Empty, "https://example.com"));
+
+        var emptyOwned = new ShortenedUrl
+        {
+            Id = Guid.NewGuid(),
+            Slug = "empty01",
+            Url = "https://example.com",
+            OwnerId = Guid.Empty,
+            CreatedAt = _clock.UtcNow
+        };
+        await _repo.AddAsync(emptyOwned);
+
+        Assert.Empty(await _service.ListForOwnerAsync(Guid.Empty));
+        Assert.Null(await _service.GetForOwnerAsync(Guid.Empty, emptyOwned.Id));
+        Assert.Null(await _service.GetAnalyticsAsync(Guid.Empty, emptyOwned.Id));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.UpdateUrlAsync(Guid.Empty, emptyOwned.Id, "https://example.org", null));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.DeleteByOwnerAsync(Guid.Empty, emptyOwned.Id));
+    }
+
     private async Task<ShortenedUrl> SeedLink(Guid ownerId, string url = "https://example.com")
         => await _service.CreateAsync(ownerId, url);
 

@@ -1,5 +1,7 @@
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using Microsoft.Extensions.Options;
 using ShortLink.Core.Entities;
 using ShortLink.Infrastructure.Security;
@@ -96,5 +98,51 @@ public sealed class JwtTokenServiceTests
         var pair = other.Generate(NewUser());
 
         Assert.Null(Create().ValidateRefreshToken(pair.RefreshToken));
+    }
+
+    [Fact]
+    public void Generate_SetsDistinctTokenTypeClaimsForAccessAndRefresh()
+    {
+        var pair = Create().Generate(NewUser());
+        var handler = new JwtSecurityTokenHandler();
+
+        var accessJwt = handler.ReadJwtToken(pair.AccessToken);
+        var refreshJwt = handler.ReadJwtToken(pair.RefreshToken);
+
+        Assert.Equal(JwtTokenService.AccessTokenType, accessJwt.Claims.Single(c => c.Type == JwtTokenService.TokenTypeClaim).Value);
+        Assert.Equal(JwtTokenService.RefreshTokenType, refreshJwt.Claims.Single(c => c.Type == JwtTokenService.TokenTypeClaim).Value);
+    }
+
+    [Fact]
+    public void ValidateRefreshToken_ReturnsNull_WhenTokenTypeClaimMissing()
+    {
+        var token = WriteCustomJwt(new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()));
+
+        Assert.Null(Create().ValidateRefreshToken(token));
+    }
+
+    [Fact]
+    public void ValidateRefreshToken_ReturnsNull_WhenSubjectIsEmptyGuid()
+    {
+        var token = WriteCustomJwt(
+            new Claim(JwtRegisteredClaimNames.Sub, Guid.Empty.ToString()),
+            new Claim(JwtTokenService.TokenTypeClaim, JwtTokenService.RefreshTokenType));
+
+        Assert.Null(Create().ValidateRefreshToken(token));
+    }
+
+    private static string WriteCustomJwt(params Claim[] claims)
+    {
+        var now = DateTime.UtcNow;
+        var jwt = new JwtSecurityToken(
+            issuer: Issuer,
+            audience: Audience,
+            claims: claims,
+            notBefore: now.AddMinutes(-1),
+            expires: now.AddMinutes(10),
+            signingCredentials: new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Key)),
+                SecurityAlgorithms.HmacSha256));
+        return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 }
