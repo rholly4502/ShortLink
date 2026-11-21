@@ -64,13 +64,22 @@ public class FixedWindowRateLimiterTests
 
 public class RedisRateLimitMiddlewareTests
 {
+    private const int AuthLimit = 2;
     private const int ApiLimit = 5;
     private static readonly TimeSpan Window = TimeSpan.FromSeconds(60);
 
     private static (RedisRateLimitMiddleware Middleware, FakeRedisStringStore Store, Func<bool> NextCalled) Build(FakeRedisStringStore? store = null)
     {
         store ??= new FakeRedisStringStore();
-        var options = new RateLimitOptions { ApiLimit = ApiLimit, RedirectLimit = 3, ApiWindowSeconds = 60, RedirectWindowSeconds = 30 };
+        var options = new RateLimitOptions
+        {
+            AuthLimit = AuthLimit,
+            AuthWindowSeconds = 45,
+            ApiLimit = ApiLimit,
+            RedirectLimit = 3,
+            ApiWindowSeconds = 60,
+            RedirectWindowSeconds = 30
+        };
         var limiter = new FixedWindowRateLimiter(store);
         var nextCalled = false;
         var middleware = new RedisRateLimitMiddleware(
@@ -111,6 +120,61 @@ public class RedisRateLimitMiddlewareTests
         await mw.InvokeAsync(ctx);
 
         Assert.Equal(StatusCodes.Status429TooManyRequests, ctx.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/auth/login")]
+    [InlineData("/auth/register")]
+    [InlineData("/auth/refresh")]
+    public async Task Invoke_AuthOverLimit_Returns429WithRetryAfter(string path)
+    {
+        var (mw, store, nextCalled) = Build();
+        store.Counts["rl:auth:1.2.3.4"] = AuthLimit;
+
+        var ctx = NewApiContext(path: path);
+        await mw.InvokeAsync(ctx);
+
+        Assert.False(nextCalled());
+        Assert.Equal(StatusCodes.Status429TooManyRequests, ctx.Response.StatusCode);
+        Assert.Equal("45", ctx.Response.Headers.RetryAfter.ToString());
+    }
+
+    [Fact]
+    public async Task Invoke_AuthUnderLimit_ForwardsToNextAndTracksAuthBucket()
+    {
+        var (mw, store, nextCalled) = Build();
+
+        var ctx = NewApiContext(path: "/auth/login");
+        await mw.InvokeAsync(ctx);
+
+        Assert.True(nextCalled());
+        Assert.Equal(200, ctx.Response.StatusCode);
+        Assert.Equal(1L, store.Counts["rl:auth:1.2.3.4"]);
+    }
+
+    [Fact]
+    public async Task Invoke_AuthBucket_IsIsolatedFromRedirectAndApi()
+    {
+        var (mw, store, nextCalled) = Build();
+        store.Counts["rl:redirect:1.2.3.4"] = 999;
+        store.Counts["rl:api:1.2.3.4"] = 999;
+
+        var ctx = NewApiContext(path: "/auth/login");
+        await mw.InvokeAsync(ctx);
+
+        Assert.True(nextCalled());
+        Assert.Equal(200, ctx.Response.StatusCode);
+        Assert.Equal(1L, store.Counts["rl:auth:1.2.3.4"]);
+    }
+
+    [Fact]
+    public void RateLimitOptions_Defaults_AuthIsStricterThanApiAndRedirect()
+    {
+        var defaults = new RateLimitOptions();
+
+        Assert.True(defaults.AuthLimit < defaults.RedirectLimit);
+        Assert.True(defaults.AuthLimit < defaults.ApiLimit);
+        Assert.Equal(TimeSpan.FromSeconds(60), defaults.AuthWindow);
     }
 
     [Fact]
