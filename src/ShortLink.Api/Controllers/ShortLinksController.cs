@@ -94,6 +94,20 @@ public sealed class ShortLinksController : ControllerBase
         return summary is null ? NotFound() : Ok(summary);
     }
 
+    [HttpGet("{id:guid}/analytics/csv")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportAnalyticsCsv(Guid id, CancellationToken ct)
+    {
+        var summary = await _service.GetAnalyticsAsync(CurrentUserId(), id, ct);
+        if (summary is null)
+            return NotFound();
+
+        var csvBytes = AnalyticsCsvExporter.ExportUtf8(summary);
+        Response.Headers.XContentTypeOptions = "nosniff";
+        return File(csvBytes, "text/csv; charset=utf-8", $"analytics-{id:D}.csv");
+    }
+
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -231,6 +231,15 @@ code {
   text-align: left;
 }
 .back-link { color: var(--accent); align-self: flex-start; }
+.analytics-header {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .analytics-total {
   display: flex;
   align-items: baseline;
@@ -240,6 +249,19 @@ code {
   border-radius: 10px;
   background: var(--accent-bg);
 }
+.export-csv-btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+}
+.export-csv-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.export-csv-btn:disabled { opacity: 0.6; cursor: default; }
 .analytics-total-label { font-size: 14px; font-weight: 600; }
 .analytics-total-value { font-family: var(--mono); font-size: 32px; color: var(--accent); }
 .analytics-section {
