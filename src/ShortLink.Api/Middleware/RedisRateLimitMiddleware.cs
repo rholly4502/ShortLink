@@ -18,10 +18,7 @@ public sealed class RedisRateLimitMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var isApi = context.Request.Path.StartsWithSegments("/api");
-        var limit = isApi ? _options.ApiLimit : _options.RedirectLimit;
-        var window = isApi ? _options.ApiWindow : _options.RedirectWindow;
-        var scope = isApi ? "api" : "redirect";
+        var (scope, limit, window) = ResolvePolicy(context.Request.Path);
 
         var clientKey = GetClientKey(context);
         var fullKey = $"rl:{scope}:{clientKey}";
@@ -34,6 +31,17 @@ public sealed class RedisRateLimitMiddleware
         }
 
         await _next(context);
+    }
+
+    private (string Scope, int Limit, TimeSpan Window) ResolvePolicy(PathString path)
+    {
+        if (path.StartsWithSegments("/auth"))
+            return ("auth", _options.AuthLimit, _options.AuthWindow);
+
+        if (path.StartsWithSegments("/api"))
+            return ("api", _options.ApiLimit, _options.ApiWindow);
+
+        return ("redirect", _options.RedirectLimit, _options.RedirectWindow);
     }
 
     private static string GetClientKey(HttpContext context)
