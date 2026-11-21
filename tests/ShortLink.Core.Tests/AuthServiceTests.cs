@@ -85,7 +85,7 @@ public sealed class AuthServiceTests
     [InlineData("  ", "a@x.com", "pw")]
     [InlineData("a", "", "pw")]
     [InlineData("a", "a@x.com", "")]
-    public async Task Register_Throws_WhenRequiredFieldEmpty(string username, string email, string password)
+    public async Task Register_Throws_WhenRequiredFieldEmpty(string? username, string email, string password)
     {
         await Assert.ThrowsAsync<ArgumentException>(() => _svc.RegisterAsync(username!, email, password));
     }

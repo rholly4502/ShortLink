@@ -16,6 +16,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore bertahap (cache layer)
+COPY ["Directory.Build.props", "./"]
 COPY ["src/ShortLink.Api/ShortLink.Api.csproj", "ShortLink.Api/"]
 COPY ["src/ShortLink.Core/ShortLink.Core.csproj", "ShortLink.Core/"]
 COPY ["src/ShortLink.Infrastructure/ShortLink.Infrastructure.csproj", "ShortLink.Infrastructure/"]
