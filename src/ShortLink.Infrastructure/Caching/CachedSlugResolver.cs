@@ -5,7 +5,7 @@ namespace ShortLink.Infrastructure.Caching;
 
 /// <summary>
 /// Resolver slug dengan komposisi cache-first + fallback PG:
-/// cek cache; miss → tanya repository (PG); kalau ketemu & belum lewat, isi cache.
+/// cek cache; miss atau cache error → tanya repository (PG); kalau ketemu &amp; belum lewat, isi cache (best-effort).
 /// Mengembalikan entitas ShortenedUrl agar caller bisa memakai Id untuk event klik.
 /// </summary>
 public sealed class CachedSlugResolver
@@ -28,9 +28,23 @@ public sealed class CachedSlugResolver
         if (string.IsNullOrWhiteSpace(slug))
             return null;
 
-        var cached = await _cache.GetAsync(slug, ct);
+        ShortenedUrl? cached = null;
+        try
+        {
+            cached = await _cache.GetAsync(slug, ct);
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            // Graceful fallback ke PostgreSQL bila Redis sementara tidak tersedia.
+        }
+
         if (cached is not null)
+        {
+            if (cached.ExpiresAt is { } cachedExpiresAt && cachedExpiresAt <= _clock.UtcNow)
+                return null;
+
             return cached;
+        }
 
         var link = await _repository.GetBySlugAsync(slug, ct);
         if (link is null)
@@ -39,7 +53,23 @@ public sealed class CachedSlugResolver
         if (link.ExpiresAt is { } expiresAt && expiresAt <= _clock.UtcNow)
             return null;
 
-        await _cache.SetAsync(slug, link, _ttl, ct);
+        var effectiveTtl = _ttl;
+        if (link.ExpiresAt is { } exp)
+        {
+            var remaining = exp - _clock.UtcNow;
+            if (remaining < effectiveTtl)
+                effectiveTtl = remaining;
+        }
+
+        try
+        {
+            await _cache.SetAsync(slug, link, effectiveTtl, ct);
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            // Best-effort cache backfill; jangan gagalkan redirect bila Redis sementara down.
+        }
+
         return link;
     }
 }

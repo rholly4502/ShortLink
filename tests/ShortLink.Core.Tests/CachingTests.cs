@@ -144,8 +144,77 @@ public class CachedSlugResolverTests
     {
         var resolver = new CachedSlugResolver(new FakeSlugCache(), new FakeRepo(), _clock, TimeSpan.FromHours(12));
 
-        Assert.Null(await resolver.ResolveAsync(null));
+        Assert.Null(await resolver.ResolveAsync(null!));
         Assert.Null(await resolver.ResolveAsync("  "));
+    }
+
+    [Fact]
+    public async Task Resolve_WhenCacheGetThrows_FallsBackToRepository()
+    {
+        var cache = new FaultySlugCache(throwOnGet: true, throwOnSet: false);
+        var repo = new FakeRepo();
+        repo.BySlug["abc123"] = NewLink("abc123");
+        var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
+
+        var link = await resolver.ResolveAsync("abc123");
+
+        Assert.NotNull(link);
+        Assert.Equal("https://example.com/abc123", link!.Url);
+    }
+
+    [Fact]
+    public async Task Resolve_WhenCacheSetThrows_StillReturnsLinkFromRepository()
+    {
+        var cache = new FaultySlugCache(throwOnGet: false, throwOnSet: true);
+        var repo = new FakeRepo();
+        repo.BySlug["abc123"] = NewLink("abc123");
+        var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
+
+        var link = await resolver.ResolveAsync("abc123");
+
+        Assert.NotNull(link);
+        Assert.Equal("https://example.com/abc123", link!.Url);
+    }
+
+    [Fact]
+    public async Task Resolve_WhenCancelledDuringCacheGet_PropagatesOperationCanceledException()
+    {
+        var cache = new FaultySlugCache(throwOnGet: true, throwOnSet: false, throwCancellation: true);
+        var repo = new ThrowingRepository();
+        var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => resolver.ResolveAsync("abc123", cts.Token));
+    }
+
+    [Fact]
+    public async Task Resolve_CachedLinkAlreadyExpired_ReturnsNullWithoutQueryingRepo()
+    {
+        var cache = new FakeSlugCache
+        {
+            Links = { ["old"] = NewLink("old", expiresAt: _clock.UtcNow.AddMinutes(-5)) }
+        };
+        var repo = new ThrowingRepository();
+        var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
+
+        var link = await resolver.ResolveAsync("old");
+
+        Assert.Null(link);
+    }
+
+    [Fact]
+    public async Task Resolve_ExpiringSoonLink_ClampsCacheTtlToRemainingTime()
+    {
+        var cache = new FakeSlugCache();
+        var repo = new FakeRepo();
+        repo.BySlug["soon"] = NewLink("soon", expiresAt: _clock.UtcNow.AddMinutes(30));
+        var resolver = new CachedSlugResolver(cache, repo, _clock, TimeSpan.FromHours(12));
+
+        var link = await resolver.ResolveAsync("soon");
+
+        Assert.NotNull(link);
+        Assert.Equal(TimeSpan.FromMinutes(30), cache.LastSetTtl);
     }
 
     private static ShortenedUrl NewLink(string slug, DateTimeOffset? expiresAt = null) => new()
@@ -201,6 +270,38 @@ public class CachedSlugResolverTests
         public Task DeleteAsync(ShortenedUrl link, CancellationToken ct = default)
             => throw new InvalidOperationException();
     }
+
+    private sealed class FaultySlugCache : ISlugCache
+    {
+        private readonly bool _throwOnGet;
+        private readonly bool _throwOnSet;
+        private readonly bool _throwCancellation;
+
+        public FaultySlugCache(bool throwOnGet, bool throwOnSet, bool throwCancellation = false)
+        {
+            _throwOnGet = throwOnGet;
+            _throwOnSet = throwOnSet;
+            _throwCancellation = throwCancellation;
+        }
+
+        public Task<ShortenedUrl?> GetAsync(string slug, CancellationToken ct = default)
+        {
+            if (_throwCancellation)
+                throw new OperationCanceledException(ct);
+            if (_throwOnGet)
+                throw new InvalidOperationException("Redis unavailable");
+            return Task.FromResult<ShortenedUrl?>(null);
+        }
+
+        public Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default)
+        {
+            if (_throwOnSet)
+                throw new InvalidOperationException("Redis unavailable");
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveAsync(string slug, CancellationToken ct = default) => Task.CompletedTask;
+    }
 }
 
 public sealed class FakeRedisStringStore : IRedisStringStore
@@ -236,12 +337,14 @@ public sealed class FakeRedisStringStore : IRedisStringStore
 public sealed class FakeSlugCache : ISlugCache
 {
     public Dictionary<string, ShortenedUrl> Links { get; } = new();
+    public TimeSpan? LastSetTtl { get; private set; }
 
     public Task<ShortenedUrl?> GetAsync(string slug, CancellationToken ct = default)
         => Task.FromResult(Links.TryGetValue(slug, out var l) ? l : null);
 
     public Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default)
     {
+        LastSetTtl = ttl;
         Links[slug] = link;
         return Task.CompletedTask;
     }
