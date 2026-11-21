@@ -60,6 +60,49 @@ public class FixedWindowRateLimiterTests
 
         Assert.True(allowedOther);
     }
+
+    [Fact]
+    public async Task IsAllowed_WhenStoreThrows_FailsOpenAndReturnsTrue()
+    {
+        var limiter = new FixedWindowRateLimiter(new FaultyRedisStringStore());
+
+        var allowed = await limiter.IsAllowedAsync("rl:api:1.2.3.4", 60, TimeSpan.FromSeconds(60));
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task IsAllowed_WhenCancelled_PropagatesOperationCanceledException()
+    {
+        var limiter = new FixedWindowRateLimiter(new FaultyRedisStringStore(throwCancellation: true));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            limiter.IsAllowedAsync("rl:api:1.2.3.4", 60, TimeSpan.FromSeconds(60), cts.Token));
+    }
+}
+
+internal sealed class FaultyRedisStringStore : IRedisStringStore
+{
+    private readonly bool _throwCancellation;
+
+    public FaultyRedisStringStore(bool throwCancellation = false)
+    {
+        _throwCancellation = throwCancellation;
+    }
+
+    public Task<string?> GetAsync(string key, CancellationToken ct = default) => Fail<string?>(ct);
+    public Task SetAsync(string key, string value, TimeSpan ttl, CancellationToken ct = default) => Fail<object?>(ct);
+    public Task<bool> DeleteAsync(string key, CancellationToken ct = default) => Fail<bool>(ct);
+    public Task<long> IncrementAsync(string key, TimeSpan ttl, CancellationToken ct = default) => Fail<long>(ct);
+
+    private Task<T> Fail<T>(CancellationToken ct)
+    {
+        if (_throwCancellation)
+            throw new OperationCanceledException(ct);
+        throw new InvalidOperationException("Redis unavailable");
+    }
 }
 
 public class RedisRateLimitMiddlewareTests
@@ -199,5 +242,28 @@ public class RedisRateLimitMiddlewareTests
         await mw.InvokeAsync(ctx);
 
         Assert.Contains("rl:api:203.0.113.9", store.Counts.Keys);
+    }
+
+    [Fact]
+    public async Task Invoke_WhenStoreThrows_FailsOpenAndForwardsToNext()
+    {
+        var options = new RateLimitOptions
+        {
+            AuthLimit = AuthLimit,
+            AuthWindowSeconds = 45,
+            ApiLimit = ApiLimit,
+            RedirectLimit = 3,
+            ApiWindowSeconds = 60,
+            RedirectWindowSeconds = 30
+        };
+        var limiter = new FixedWindowRateLimiter(new FaultyRedisStringStore());
+        var nextCalled = false;
+        var mw = new RedisRateLimitMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, limiter, options);
+        var ctx = NewApiContext();
+
+        await mw.InvokeAsync(ctx);
+
+        Assert.True(nextCalled);
+        Assert.Equal(200, ctx.Response.StatusCode);
     }
 }

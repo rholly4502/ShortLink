@@ -7,9 +7,16 @@ public sealed class RedisStringStore : IRedisStringStore, IAsyncDisposable
 {
     private readonly IConnectionMultiplexer _mux;
 
+    public static ConfigurationOptions BuildConfigurationOptions(string connectionString)
+    {
+        var options = ConfigurationOptions.Parse(connectionString);
+        options.AbortOnConnectFail = false;
+        return options;
+    }
+
     public RedisStringStore(string connectionString)
     {
-        _mux = ConnectionMultiplexer.Connect(connectionString);
+        _mux = ConnectionMultiplexer.Connect(BuildConfigurationOptions(connectionString));
     }
 
     public async Task<string?> GetAsync(string key, CancellationToken ct = default)
