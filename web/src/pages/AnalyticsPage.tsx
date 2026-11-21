@@ -11,6 +11,8 @@ export default function AnalyticsPage({ client = defaultClient }: { client?: Api
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -35,6 +37,31 @@ export default function AnalyticsPage({ client = defaultClient }: { client?: Api
 
   if (!client.isAuthenticated()) return <Navigate to="/login" replace />
 
+  async function onExportCsv() {
+    if (!id) return
+    setExportError(null)
+    setExporting(true)
+    try {
+      const csv = await client.links.analyticsCsv(id)
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      try {
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `analytics-${id}.csv`
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    } catch (err) {
+      setExportError(err instanceof ApiError ? err.message : 'Gagal mengekspor CSV analytics.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const maxDay = summary && summary.byDay.length > 0
     ? Math.max(...summary.byDay.map((d) => d.count))
     : 0
@@ -49,10 +76,21 @@ export default function AnalyticsPage({ client = defaultClient }: { client?: Api
 
       {summary && (
         <>
-          <div className="analytics-total">
-            <span className="analytics-total-label">Total klik</span>
-            <span className="analytics-total-value">{summary.totalClicks}</span>
+          <div className="analytics-header">
+            <div className="analytics-total">
+              <span className="analytics-total-label">Total klik</span>
+              <span className="analytics-total-value">{summary.totalClicks}</span>
+            </div>
+            <button
+              type="button"
+              className="export-csv-btn"
+              onClick={onExportCsv}
+              disabled={exporting}
+            >
+              {exporting ? 'Mengekspor…' : 'Export CSV'}
+            </button>
           </div>
+          {exportError && <p role="alert" className="auth-error">{exportError}</p>}
 
           <section className="analytics-section" aria-label="Klik per hari">
             <h3>Klik per hari</h3>

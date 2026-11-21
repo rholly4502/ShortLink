@@ -136,6 +136,38 @@ describe('api client', () => {
     expect(url).toBe(`${baseUrl}/api/links/l1`)
     expect(init.method).toBe('DELETE')
   })
+
+  it('links.analyticsCsv fetches /api/links/:id/analytics/csv with Bearer token and Accept text/csv', async () => {
+    const csvPayload = 'section,label,clicks\nsummary,total,5\n'
+    fetchMock.mockResolvedValue(
+      new Response(csvPayload, {
+        status: 200,
+        headers: { 'Content-Type': 'text/csv; charset=utf-8' },
+      }),
+    )
+    const client = createApiClient({
+      storage: { getAccessToken: () => 'token123', setTokens: vi.fn(), clear: vi.fn() },
+    })
+
+    const csv = await client.links.analyticsCsv('l1')
+
+    expect(csv).toBe(csvPayload)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${baseUrl}/api/links/l1/analytics/csv`)
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer token123')
+    expect((init.headers as Record<string, string>)['Accept']).toBe('text/csv')
+  })
+
+  it('links.analyticsCsv throws ApiError using server error field on non-2xx', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'Terlalu banyak permintaan.' }, 429))
+    const client = createApiClient({
+      storage: { getAccessToken: () => 'token123', setTokens: vi.fn(), clear: vi.fn() },
+    })
+
+    const err = await client.links.analyticsCsv('l1').catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err).toMatchObject({ message: 'Terlalu banyak permintaan.', status: 429 })
+  })
 })
 
 describe('isAuthenticated', () => {

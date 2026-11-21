@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { ApiError } from '../api/client'
 import type { ApiClient } from '../api/client'
 import type { AnalyticsSummary } from '../api/types'
 import AnalyticsPage from './AnalyticsPage'
 
-afterEach(cleanup)
+afterEach(() => {
+  vi.restoreAllMocks()
+  cleanup()
+})
 
 const summary: AnalyticsSummary = {
   linkId: 'l1',
@@ -25,7 +30,9 @@ const summary: AnalyticsSummary = {
   ],
 }
 
-function makeClient(over: Partial<{ analytics: ReturnType<typeof vi.fn> }> = {}) {
+function makeClient(
+  over: Partial<{ analytics: ReturnType<typeof vi.fn>; analyticsCsv: ReturnType<typeof vi.fn> }> = {},
+) {
   const linksApi = {
     list: vi.fn(),
     get: vi.fn(),
@@ -33,6 +40,7 @@ function makeClient(over: Partial<{ analytics: ReturnType<typeof vi.fn> }> = {})
     update: vi.fn(),
     remove: vi.fn(),
     analytics: vi.fn(async () => summary),
+    analyticsCsv: vi.fn(async () => 'section,label,clicks\nsummary,total,12\n'),
     ...over,
   }
   const client = {
@@ -98,5 +106,57 @@ describe('AnalyticsPage', () => {
     const { client } = makeClient()
     renderPage(client)
     expect(await screen.findByRole('link', { name: /kembali/i })).toBeTruthy()
+  })
+
+  it('mengekspor CSV dan memicu unduhan blob saat tombol Export CSV diklik', async () => {
+    const { client, linksApi } = makeClient()
+    const origCreateObjectUrl = URL.createObjectURL
+    const origRevokeObjectUrl = URL.revokeObjectURL
+    const createdBlobs: Blob[] = []
+    const createObjectUrlMock = vi.fn((obj: Blob | MediaSource) => {
+      createdBlobs.push(obj as Blob)
+      return 'blob:analytics-l1'
+    })
+    const revokeObjectUrlMock = vi.fn()
+    URL.createObjectURL = createObjectUrlMock
+    URL.revokeObjectURL = revokeObjectUrlMock
+
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    try {
+      renderPage(client)
+      const exportBtn = await screen.findByRole('button', { name: /export csv/i })
+      await userEvent.click(exportBtn)
+
+      expect(linksApi.analyticsCsv).toHaveBeenCalledWith('l1')
+      expect(createObjectUrlMock).toHaveBeenCalledTimes(1)
+      expect(createdBlobs[0]).toBeInstanceOf(Blob)
+      expect(createdBlobs[0].type).toContain('text/csv')
+      expect(await createdBlobs[0].text()).toBe('section,label,clicks\nsummary,total,12\n')
+      expect(clickSpy).toHaveBeenCalledTimes(1)
+      const anchor = clickSpy.mock.instances[0] as HTMLAnchorElement
+      expect(anchor.download).toBe('analytics-l1.csv')
+      expect(anchor.getAttribute('href')).toBe('blob:analytics-l1')
+      expect(revokeObjectUrlMock).toHaveBeenCalledWith('blob:analytics-l1')
+    } finally {
+      URL.createObjectURL = origCreateObjectUrl
+      URL.revokeObjectURL = origRevokeObjectUrl
+    }
+  })
+
+  it('menampilkan error alert saat ekspor CSV gagal tanpa menghilangkan ringkasan analytics', async () => {
+    const { client } = makeClient({
+      analyticsCsv: vi.fn(async () => {
+        throw new ApiError('Gagal ekspor dari server.', 500)
+      }),
+    })
+    renderPage(client)
+
+    const exportBtn = await screen.findByRole('button', { name: /export csv/i })
+    await userEvent.click(exportBtn)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Gagal ekspor dari server.')
+    expect(screen.getByText('12')).toBeTruthy()
   })
 })

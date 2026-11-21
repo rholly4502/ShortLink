@@ -64,6 +64,7 @@ export interface ApiClient {
     update(id: string, input: { url: string; expiresAt?: string | null }): Promise<LinkResponse>
     remove(id: string): Promise<void>
     analytics(id: string): Promise<AnalyticsSummary>
+    analyticsCsv(id: string): Promise<string>
   }
   /** True when an access token is stored. */
   isAuthenticated(): boolean
@@ -82,7 +83,7 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
       ? localStorageStorage(globalThis.localStorage)
       : memoryStorage())
 
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  async function send(path: string, init: RequestInit = {}): Promise<Response> {
     const headers: Record<string, string> = {
       ...((init.headers as Record<string, string> | undefined) ?? {}),
     }
@@ -97,16 +98,27 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
     if (!res.ok) {
       let message = `Request failed (${res.status})`
       try {
-        const payload = (await res.json()) as { message?: string }
-        if (payload?.message) message = payload.message
+        const payload = (await res.json()) as { message?: string; error?: string }
+        const extracted = payload?.message ?? payload?.error
+        if (extracted) message = extracted
       } catch {
         // non-JSON error body
       }
       throw new ApiError(message, res.status)
     }
 
+    return res
+  }
+
+  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const res = await send(path, init)
     if (res.status === 204) return undefined as T
     return (await res.json()) as T
+  }
+
+  async function requestText(path: string, init: RequestInit = {}): Promise<string> {
+    const res = await send(path, init)
+    return await res.text()
   }
 
   function json(method: string, body?: unknown): RequestInit {
@@ -149,6 +161,7 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
         request(`/api/links/${id}`, json('PUT', { url: input.url, expiresAt: input.expiresAt ?? undefined })),
       remove: (id) => request(`/api/links/${id}`, { method: 'DELETE' }),
       analytics: (id) => request(`/api/links/${id}/analytics`),
+      analyticsCsv: (id) => requestText(`/api/links/${id}/analytics/csv`, { headers: { Accept: 'text/csv' } }),
     },
     isAuthenticated: () => storage.getAccessToken() !== null,
   }
