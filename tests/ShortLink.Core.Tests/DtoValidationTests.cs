@@ -40,8 +40,8 @@ public class DtoValidationTests
     [InlineData("user01", "not-an-email", "pass12345")]
     [InlineData("user01", "user@example.com", "short")]
     [InlineData("user01", "user@example.com", null)]
-    public void Register_InvalidPayload_Fails(string u, string e, string p) =>
-        Assert.False(IsValid(new RegisterRequest(u, e, p)));
+    public void Register_InvalidPayload_Fails(string? u, string? e, string? p) =>
+        Assert.False(IsValid(new RegisterRequest(u!, e!, p!)));
 
     // --- Login ---
 
@@ -51,8 +51,8 @@ public class DtoValidationTests
     [Theory]
     [InlineData(null, "pass12345")]
     [InlineData("user01", null)]
-    public void Login_InvalidPayload_Fails(string i, string p) =>
-        Assert.False(IsValid(new LoginRequest(i, p)));
+    public void Login_InvalidPayload_Fails(string? i, string? p) =>
+        Assert.False(IsValid(new LoginRequest(i!, p!)));
 
     // --- Refresh ---
 
@@ -70,7 +70,7 @@ public class DtoValidationTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public void CreateLink_MissingUrl_Fails(string url) => Assert.False(IsValid(new CreateLinkRequest(url, null)));
+    public void CreateLink_MissingUrl_Fails(string? url) => Assert.False(IsValid(new CreateLinkRequest(url!, null)));
 
     [Fact]
     public void UpdateLink_MissingUrl_Fails() => Assert.False(IsValid(new UpdateLinkRequest(null!, null)));
