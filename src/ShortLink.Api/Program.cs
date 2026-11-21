@@ -61,10 +61,15 @@ var rateLimit = builder.Configuration.GetSection(RateLimitOptions.SectionName).G
 builder.Services.AddSingleton(rateLimit);
 builder.Services.AddSingleton<FixedWindowRateLimiter>();
 
-// RabbitMQ click publisher
+// RabbitMQ click publisher (lazy connect + auto-reconnect with cooldown)
 var amqp = builder.Configuration["RabbitMQ:ConnectionString"];
-builder.Services.AddSingleton<IMessagePublisher>(_ =>
-    RabbitMqMessagePublisher.CreateAsync(amqp!).GetAwaiter().GetResult());
+if (string.IsNullOrWhiteSpace(amqp))
+    throw new InvalidOperationException("RabbitMQ:ConnectionString tidak ditemukan.");
+builder.Services.AddSingleton<IMessagePublisher>(sp =>
+    new RabbitMqMessagePublisher(
+        amqp,
+        sp.GetRequiredService<IClock>(),
+        logger: sp.GetRequiredService<ILogger<RabbitMqMessagePublisher>>()));
 builder.Services.AddSingleton<IClickEventPublisher, RabbitMqClickEventPublisher>();
 
 var app = builder.Build();

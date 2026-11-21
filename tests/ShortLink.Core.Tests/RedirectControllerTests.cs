@@ -83,6 +83,47 @@ public class RedirectControllerTests
         Assert.Empty(_publisher.Published);
     }
 
+    [Fact]
+    public async Task RedirectTo_WhenPublisherThrows_StillReturnsRedirectToUrl()
+    {
+        var link = NewLink("abc123", url: "https://example.com/target");
+        _repo.BySlug["abc123"] = link;
+        _publisher.ExceptionToThrow = _ => new InvalidOperationException("Broker unreachable");
+        var ctrl = NewController();
+
+        var result = await ctrl.RedirectTo("abc123", default);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://example.com/target", redirect.Url);
+    }
+
+    [Fact]
+    public async Task RedirectTo_WhenPublisherThrowsInternalTimeout_StillReturnsRedirectToUrl()
+    {
+        var link = NewLink("abc123", url: "https://example.com/target");
+        _repo.BySlug["abc123"] = link;
+        _publisher.ExceptionToThrow = _ => new TaskCanceledException("Connect timeout");
+        var ctrl = NewController();
+
+        var result = await ctrl.RedirectTo("abc123", default);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://example.com/target", redirect.Url);
+    }
+
+    [Fact]
+    public async Task RedirectTo_WhenPublisherCancelledByRequest_PropagatesOperationCanceledException()
+    {
+        var link = NewLink("abc123", url: "https://example.com/target");
+        _repo.BySlug["abc123"] = link;
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        _publisher.ExceptionToThrow = ct => new OperationCanceledException(ct);
+        var ctrl = NewController();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => ctrl.RedirectTo("abc123", cts.Token));
+    }
+
     private static ShortenedUrl NewLink(string slug, string? url = null, DateTimeOffset? expiresAt = null) => new()
     {
         Id = Guid.NewGuid(),
@@ -122,8 +163,13 @@ public class RedirectControllerTests
     private sealed class FakeClickPublisher : IClickEventPublisher
     {
         public List<ClickEvent> Published { get; } = new();
+        public Func<CancellationToken, Exception>? ExceptionToThrow { get; set; }
+
         public Task PublishAsync(ClickEvent clickEvent, CancellationToken ct = default)
         {
+            if (ExceptionToThrow is not null)
+                throw ExceptionToThrow(ct);
+
             Published.Add(clickEvent);
             return Task.CompletedTask;
         }

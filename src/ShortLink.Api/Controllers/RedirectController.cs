@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using ShortLink.Core;
 using ShortLink.Core.Abstractions;
 using ShortLink.Core.Events;
@@ -13,12 +14,18 @@ public sealed class RedirectController : ControllerBase
     private readonly CachedSlugResolver _resolver;
     private readonly IClickEventPublisher _publisher;
     private readonly IClock _clock;
+    private readonly ILogger<RedirectController>? _logger;
 
-    public RedirectController(CachedSlugResolver resolver, IClickEventPublisher publisher, IClock clock)
+    public RedirectController(
+        CachedSlugResolver resolver,
+        IClickEventPublisher publisher,
+        IClock clock,
+        ILogger<RedirectController>? logger = null)
     {
         _resolver = resolver;
         _publisher = publisher;
         _clock = clock;
+        _logger = logger;
     }
 
     [HttpGet("{slug:regex(^[[a-zA-Z0-9]]+$)}")]
@@ -31,8 +38,7 @@ public sealed class RedirectController : ControllerBase
             return NotFound();
 
         var userAgent = Request.Headers.UserAgent.ToString();
-
-        await _publisher.PublishAsync(new ClickEvent(
+        var clickEvent = new ClickEvent(
             link.Id,
             _clock.UtcNow,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -41,8 +47,30 @@ public sealed class RedirectController : ControllerBase
             DeviceTypeDetector.Detect(userAgent),
             Country: null,
             Region: null,
-            City: null), ct);
+            City: null);
+
+        await TryPublishClickAsync(clickEvent, slug, ct);
 
         return Redirect(link.Url);
+    }
+
+    private async Task TryPublishClickAsync(ClickEvent clickEvent, string slug, CancellationToken ct)
+    {
+        try
+        {
+            await _publisher.PublishAsync(clickEvent, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(
+                ex,
+                "Best-effort click event publish failed for link '{LinkId}' (slug '{Slug}'); proceeding with redirect.",
+                clickEvent.ShortenedUrlId,
+                slug);
+        }
     }
 }
