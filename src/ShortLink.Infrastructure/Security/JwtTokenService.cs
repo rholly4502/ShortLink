@@ -11,9 +11,9 @@ namespace ShortLink.Infrastructure.Security;
 
 public sealed class JwtTokenService : IAuthTokenService
 {
-    private const string TokenTypeClaim = "token_type";
-    private const string RefreshTokenType = "refresh";
-    private const string AccessTokenType = "access";
+    public const string TokenTypeClaim = "token_type";
+    public const string RefreshTokenType = "refresh";
+    public const string AccessTokenType = "access";
 
     private readonly JwtOptions _o;
 
@@ -33,14 +33,23 @@ public sealed class JwtTokenService : IAuthTokenService
 
     public Guid? ValidateRefreshToken(string refreshToken)
     {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return null;
+
         try
         {
             var principal = new JwtSecurityTokenHandler().ValidateToken(refreshToken, NewValidationParameters(), out var validated);
-            if (validated is not JwtSecurityToken jwt || jwt.Payload[TokenTypeClaim]?.ToString() != RefreshTokenType)
+            if (validated is not JwtSecurityToken jwt
+                || !jwt.Payload.TryGetValue(TokenTypeClaim, out var tokenType)
+                || !string.Equals(tokenType?.ToString(), RefreshTokenType, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            if (!jwt.Payload.TryGetValue(JwtRegisteredClaimNames.Sub, out var sub))
                 return null;
 
-            var sub = jwt.Payload[JwtRegisteredClaimNames.Sub]?.ToString();
-            return Guid.TryParse(sub, out var id) ? id : null;
+            return Guid.TryParse(sub?.ToString(), out var id) && id != Guid.Empty ? id : null;
         }
         catch
         {

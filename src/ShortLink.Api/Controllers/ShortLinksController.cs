@@ -26,11 +26,16 @@ public sealed class ShortLinksController : ControllerBase
     [HttpPost]
     [ProducesResponseType<LinkResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LinkResponse>> Create(CreateLinkRequest request, CancellationToken ct)
     {
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
         try
         {
-            var link = await _service.CreateAsync(CurrentUserId(), request.Url, request.ExpiresAt, ct);
+            var link = await _service.CreateAsync(ownerId, request.Url, request.ExpiresAt, ct);
             return CreatedAtAction(nameof(Get), new { id = link.Id }, ToResponse(link));
         }
         catch (Exception ex)

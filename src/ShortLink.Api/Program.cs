@@ -6,6 +6,7 @@ using ShortLink.Core.Abstractions;
 using ShortLink.Infrastructure.Caching;
 using ShortLink.Infrastructure.Messaging;
 using ShortLink.Api.Middleware;
+using ShortLink.Api.Security;
 using ShortLink.Infrastructure.Persistence;
 using ShortLink.Infrastructure.Security;
 
@@ -30,6 +31,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
             ClockSkew = TimeSpan.Zero
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = JwtBearerValidation.ValidateAccessTokenAsync
         };
     });
 builder.Services.AddAuthorization();
