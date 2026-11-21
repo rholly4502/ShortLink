@@ -16,11 +16,16 @@ public sealed class ShortLinksController : ControllerBase
 {
     private readonly ShortLinkService _service;
     private readonly ISlugCache _slugCache;
+    private readonly ILogger<ShortLinksController>? _logger;
 
-    public ShortLinksController(ShortLinkService service, ISlugCache slugCache)
+    public ShortLinksController(
+        ShortLinkService service,
+        ISlugCache slugCache,
+        ILogger<ShortLinksController>? logger = null)
     {
         _service = service;
         _slugCache = slugCache;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -70,10 +75,10 @@ public sealed class ShortLinksController : ControllerBase
         try
         {
             var link = await _service.UpdateUrlAsync(CurrentUserId(), id, request.Url, request.ExpiresAt, ct);
-            await _slugCache.RemoveAsync(link.Slug, ct);
+            await TryInvalidateCacheAsync(link.Slug, ct);
             return Ok(ToResponse(link));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return ErrorMapper.Result<LinkResponse>(ex);
         }
@@ -99,12 +104,24 @@ public sealed class ShortLinksController : ControllerBase
             if (link is null)
                 return NotFound();
             await _service.DeleteByOwnerAsync(CurrentUserId(), id, ct);
-            await _slugCache.RemoveAsync(link.Slug, ct);
+            await TryInvalidateCacheAsync(link.Slug, ct);
             return NoContent();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return ErrorMapper.Result(ex);
+        }
+    }
+
+    private async Task TryInvalidateCacheAsync(string slug, CancellationToken ct)
+    {
+        try
+        {
+            await _slugCache.RemoveAsync(slug, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && !ct.IsCancellationRequested)
+        {
+            _logger?.LogWarning(ex, "Best-effort Redis cache invalidation failed for slug '{Slug}'.", slug);
         }
     }
 

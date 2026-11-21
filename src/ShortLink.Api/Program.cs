@@ -53,7 +53,8 @@ builder.Services.AddScoped<CachedSlugResolver>(sp =>
         sp.GetRequiredService<ISlugCache>(),
         sp.GetRequiredService<IShortLinkRepository>(),
         sp.GetRequiredService<IClock>(),
-        TimeSpan.FromHours(12)));
+        TimeSpan.FromHours(12),
+        sp.GetRequiredService<ILogger<CachedSlugResolver>>()));
 
 // Rate limit (Redis fixed-window)
 var rateLimit = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>() ?? new RateLimitOptions();

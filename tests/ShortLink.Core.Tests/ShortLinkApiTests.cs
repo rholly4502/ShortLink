@@ -30,11 +30,11 @@ public class ShortLinkApiTests
         return link;
     }
 
-    private ShortLinksController NewController(Guid caller)
+    private ShortLinksController NewController(Guid caller, ISlugCache? slugCache = null)
     {
         var claims = new[] { new Claim(ClaimTypes.NameIdentifier, caller.ToString()) };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
-        return new ShortLinksController(_service, new FakeSlugCache())
+        return new ShortLinksController(_service, slugCache ?? new FakeSlugCache())
         {
             ControllerContext = new ControllerContext
             {
@@ -279,6 +279,78 @@ public class ShortLinkApiTests
         var ctrl = NewController(_owner);
         var result = await ctrl.Delete(Guid.NewGuid(), default);
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task Update_WhenCacheInvalidationThrows_StillReturnsOkUpdated()
+    {
+        var link = await SeedLink(_owner);
+        var ctrl = NewController(_owner, new ThrowingRemoveSlugCache());
+
+        var result = await ctrl.Update(link.Id, new UpdateLinkRequest("https://example.org/updated", null), default);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<LinkResponse>(ok.Value);
+        Assert.Equal("https://example.org/updated", body.Url);
+        Assert.Contains(link.Id, _repo.Updated);
+    }
+
+    [Fact]
+    public async Task Delete_WhenCacheInvalidationThrows_StillReturnsNoContent()
+    {
+        var link = await SeedLink(_owner);
+        var ctrl = NewController(_owner, new ThrowingRemoveSlugCache());
+
+        var result = await ctrl.Delete(link.Id, default);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Contains(link.Id, _repo.Deleted);
+    }
+
+    [Fact]
+    public async Task Update_WhenCacheInvalidationCancelled_PropagatesOperationCanceledException()
+    {
+        var link = await SeedLink(_owner);
+        var ctrl = NewController(_owner, new ThrowingRemoveSlugCache(throwCancellation: true));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            ctrl.Update(link.Id, new UpdateLinkRequest("https://example.org/updated", null), cts.Token));
+    }
+
+    [Fact]
+    public async Task Delete_WhenCacheInvalidationCancelled_PropagatesOperationCanceledException()
+    {
+        var link = await SeedLink(_owner);
+        var ctrl = NewController(_owner, new ThrowingRemoveSlugCache(throwCancellation: true));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => ctrl.Delete(link.Id, cts.Token));
+    }
+
+    private sealed class ThrowingRemoveSlugCache : ISlugCache
+    {
+        private readonly bool _throwCancellation;
+
+        public ThrowingRemoveSlugCache(bool throwCancellation = false)
+        {
+            _throwCancellation = throwCancellation;
+        }
+
+        public Task<ShortenedUrl?> GetAsync(string slug, CancellationToken ct = default)
+            => Task.FromResult<ShortenedUrl?>(null);
+
+        public Task SetAsync(string slug, ShortenedUrl link, TimeSpan? ttl = null, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task RemoveAsync(string slug, CancellationToken ct = default)
+        {
+            if (_throwCancellation)
+                throw new OperationCanceledException(ct);
+            throw new InvalidOperationException("Redis unavailable");
+        }
     }
 
     // --- Fakes ---
