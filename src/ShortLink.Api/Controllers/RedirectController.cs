@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using ShortLink.Api.Routing;
 using ShortLink.Core;
 using ShortLink.Core.Abstractions;
 using ShortLink.Core.Events;
@@ -28,7 +29,7 @@ public sealed class RedirectController : ControllerBase
         _logger = logger;
     }
 
-    [HttpGet("{slug:regex(^[[a-zA-Z0-9]]+$)}")]
+    [HttpGet("{slug:regex(^[[a-zA-Z0-9]]+$):" + NonReservedSlugRouteConstraint.ConstraintName + "}")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RedirectTo(string slug, CancellationToken ct)

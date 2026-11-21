@@ -6,6 +6,7 @@ using ShortLink.Core.Abstractions;
 using ShortLink.Infrastructure.Caching;
 using ShortLink.Infrastructure.Messaging;
 using ShortLink.Api.Middleware;
+using ShortLink.Api.Routing;
 using ShortLink.Api.Security;
 using ShortLink.Infrastructure.Persistence;
 using ShortLink.Infrastructure.Security;
@@ -14,6 +15,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddOpenApi();
+builder.Services.AddRouting(options =>
+    options.ConstraintMap.Add(NonReservedSlugRouteConstraint.ConstraintName, typeof(NonReservedSlugRouteConstraint)));
 builder.Services.AddControllers();
 builder.Services.AddShortLinkPersistence(builder.Configuration);
 
@@ -94,6 +97,10 @@ if (!app.Environment.IsDevelopment())
     app.UseStaticFiles();
 }
 app.MapControllers();
+app.MapMethods("/api/health", [HttpMethods.Get, HttpMethods.Head], () => Results.Ok(new { status = "ok" }))
+    .AllowAnonymous();
+app.MapFallback("/api/{**path}", () => Results.NotFound());
+app.MapFallback("/auth/{**path}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");
 
 app.Run();
