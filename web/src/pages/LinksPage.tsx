@@ -25,6 +25,7 @@ export default function LinksPage({ client = defaultClient }: { client?: ApiClie
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [newUrl, setNewUrl] = useState('')
+  const [newCustomSlug, setNewCustomSlug] = useState('')
   const [newExpires, setNewExpires] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -56,8 +57,13 @@ export default function LinksPage({ client = defaultClient }: { client?: ApiClie
     setFormError(null)
     setSubmitting(true)
     try {
-      await client.links.create({ url: newUrl, expiresAt: toIso(newExpires) })
+      const trimmedSlug = newCustomSlug.trim()
+      const payload = trimmedSlug
+        ? { url: newUrl, expiresAt: toIso(newExpires), customSlug: trimmedSlug }
+        : { url: newUrl, expiresAt: toIso(newExpires) }
+      await client.links.create(payload)
       setNewUrl('')
+      setNewCustomSlug('')
       setNewExpires('')
       await load()
     } catch (err) {
@@ -108,6 +114,14 @@ export default function LinksPage({ client = defaultClient }: { client?: ApiClie
       <form className="auth-card" onSubmit={onCreate}>
         <label htmlFor="new-url">URL Baru</label>
         <input id="new-url" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://…" />
+        <label htmlFor="new-custom-slug">Alias Kustom (opsional)</label>
+        <input
+          id="new-custom-slug"
+          value={newCustomSlug}
+          onChange={(e) => setNewCustomSlug(e.target.value)}
+          placeholder="mis. promo2026 (3–32 huruf/angka)"
+          maxLength={32}
+        />
         <label htmlFor="new-expires">Kadaluarsa (opsional)</label>
         <input id="new-expires" type="datetime-local" value={newExpires} onChange={(e) => setNewExpires(e.target.value)} />
         {formError && <p role="alert" className="auth-error">{formError}</p>}

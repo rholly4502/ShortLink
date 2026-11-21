@@ -59,7 +59,7 @@ export interface ApiClient {
   }
   links: {
     list(): Promise<LinkResponse[]>
-    create(input: { url: string; expiresAt?: string | null }): Promise<LinkResponse>
+    create(input: { url: string; expiresAt?: string | null; customSlug?: string | null }): Promise<LinkResponse>
     get(id: string): Promise<LinkResponse>
     update(id: string, input: { url: string; expiresAt?: string | null }): Promise<LinkResponse>
     remove(id: string): Promise<void>
@@ -133,8 +133,17 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
     },
     links: {
       list: () => request('/api/links'),
-      create: (input) =>
-        request('/api/links', json('POST', { url: input.url, expiresAt: input.expiresAt ?? undefined })),
+      create: (input) => {
+        const trimmedSlug = input.customSlug?.trim()
+        return request(
+          '/api/links',
+          json('POST', {
+            url: input.url,
+            expiresAt: input.expiresAt ?? undefined,
+            ...(trimmedSlug ? { customSlug: trimmedSlug } : {}),
+          }),
+        )
+      },
       get: (id) => request(`/api/links/${id}`),
       update: (id, input) =>
         request(`/api/links/${id}`, json('PUT', { url: input.url, expiresAt: input.expiresAt ?? undefined })),

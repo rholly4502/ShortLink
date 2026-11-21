@@ -26,10 +26,18 @@ public sealed class ShortLinkService
         _clickRepository = clickRepository;
     }
 
-    public async Task<ShortenedUrl> CreateAsync(
+    public Task<ShortenedUrl> CreateAsync(
         Guid ownerId,
         string url,
         DateTimeOffset? expiresAt = null,
+        CancellationToken ct = default)
+        => CreateAsync(ownerId, url, expiresAt, customSlug: null, ct);
+
+    public async Task<ShortenedUrl> CreateAsync(
+        Guid ownerId,
+        string url,
+        DateTimeOffset? expiresAt,
+        string? customSlug,
         CancellationToken ct = default)
     {
         if (ownerId == Guid.Empty)
@@ -42,11 +50,22 @@ public sealed class ShortLinkService
             throw new ArgumentException("ExpiresAt harus berada di masa depan.", nameof(expiresAt));
 
         string slug;
-        do
+        if (!string.IsNullOrEmpty(customSlug))
         {
-            slug = _slugGenerator.Generate();
+            if (!SlugValidator.TryValidateCustomSlug(customSlug, out slug, out var slugError))
+                throw new ArgumentException(slugError, nameof(customSlug));
+
+            if (await _repository.SlugExistsAsync(slug, ct))
+                throw new InvalidOperationException($"Custom slug '{slug}' sudah digunakan.");
         }
-        while (await _repository.SlugExistsAsync(slug, ct));
+        else
+        {
+            do
+            {
+                slug = _slugGenerator.Generate();
+            }
+            while (SlugValidator.IsReserved(slug) || await _repository.SlugExistsAsync(slug, ct));
+        }
 
         var link = new ShortenedUrl
         {

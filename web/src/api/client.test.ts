@@ -91,6 +91,39 @@ describe('api client', () => {
     expect(r.slug).toBe('abc')
   })
 
+  it('links.create sends trimmed customSlug when provided', async () => {
+    const link: LinkResponse = {
+      id: 'l1', slug: 'promo2026', url: 'https://x.io', ownerId: 'u1',
+      createdAt: '2026-01-01T00:00:00Z', expiresAt: null, clickCount: 0,
+    }
+    fetchMock.mockResolvedValue(jsonResponse(link))
+    const client = createApiClient({
+      storage: { getAccessToken: () => 't', setTokens: vi.fn(), clear: vi.fn() },
+    })
+
+    const r = await client.links.create({ url: 'https://x.io', customSlug: '  promo2026  ' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(init.body as string)).toEqual({ url: 'https://x.io', customSlug: 'promo2026' })
+    expect(r.slug).toBe('promo2026')
+  })
+
+  it('links.create omits customSlug when blank or whitespace', async () => {
+    const link: LinkResponse = {
+      id: 'l1', slug: 'abc', url: 'https://x.io', ownerId: 'u1',
+      createdAt: '2026-01-01T00:00:00Z', expiresAt: null, clickCount: 0,
+    }
+    fetchMock.mockResolvedValue(jsonResponse(link))
+    const client = createApiClient({
+      storage: { getAccessToken: () => 't', setTokens: vi.fn(), clear: vi.fn() },
+    })
+
+    await client.links.create({ url: 'https://x.io', customSlug: '   ' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(init.body as string)).toEqual({ url: 'https://x.io' })
+  })
+
   it('delete sends DELETE and treats 204 as success', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
     const client = createApiClient({
