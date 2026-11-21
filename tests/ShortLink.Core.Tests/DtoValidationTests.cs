@@ -74,4 +74,12 @@ public class DtoValidationTests
 
     [Fact]
     public void UpdateLink_MissingUrl_Fails() => Assert.False(IsValid(new UpdateLinkRequest(null!, null)));
+
+    [Fact]
+    public void CreateLink_ValidCustomSlug_Passes() =>
+        Assert.True(IsValid(new CreateLinkRequest("https://example.com", null, "promo2026")));
+
+    [Fact]
+    public void CreateLink_CustomSlugTooLong_Fails() =>
+        Assert.False(IsValid(new CreateLinkRequest("https://example.com", null, new string('a', 33))));
 }

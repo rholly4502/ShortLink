@@ -32,6 +32,7 @@ public sealed class ShortLinksController : ControllerBase
     [ProducesResponseType<LinkResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<LinkResponse>> Create(CreateLinkRequest request, CancellationToken ct)
     {
         var ownerId = CurrentUserId();
@@ -40,10 +41,10 @@ public sealed class ShortLinksController : ControllerBase
 
         try
         {
-            var link = await _service.CreateAsync(ownerId, request.Url, request.ExpiresAt, ct);
+            var link = await _service.CreateAsync(ownerId, request.Url, request.ExpiresAt, request.CustomSlug, ct);
             return CreatedAtAction(nameof(Get), new { id = link.Id }, ToResponse(link));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return ErrorMapper.Result<LinkResponse>(ex);
         }

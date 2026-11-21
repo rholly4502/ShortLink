@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { ApiError } from '../api/client'
 import type { ApiClient } from '../api/client'
 import type { LinkResponse } from '../api/types'
 import LinksPage from './LinksPage'
@@ -23,10 +24,10 @@ function makeClient(initial: LinkResponse[] = []) {
   const linksApi = {
     list: vi.fn(async () => [...links]),
     get: vi.fn(),
-    create: vi.fn(async (input: { url: string; expiresAt?: string | null }) => {
+    create: vi.fn(async (input: { url: string; expiresAt?: string | null; customSlug?: string | null }) => {
       const link = makeLink({
         id: `l${links.length + 1}`,
-        slug: `s${links.length + 1}`,
+        slug: input.customSlug ?? `s${links.length + 1}`,
         url: input.url,
         expiresAt: input.expiresAt ?? null,
       })
@@ -122,5 +123,38 @@ describe('LinksPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /analytics/i }))
 
     expect(screen.getByText('Analytics Page')).toBeTruthy()
+  })
+
+  it('membuat tautan dengan alias kustom dan mengosongkan input setelah berhasil', async () => {
+    const { client, linksApi } = makeClient()
+    renderPage(client)
+
+    const urlInput = screen.getByLabelText('URL Baru')
+    const slugInput = screen.getByLabelText('Alias Kustom (opsional)') as HTMLInputElement
+
+    await userEvent.type(urlInput, 'https://promo.io')
+    await userEvent.type(slugInput, '  promo2026  ')
+    await userEvent.click(screen.getByRole('button', { name: /buat/i }))
+
+    expect(linksApi.create).toHaveBeenCalledWith({
+      url: 'https://promo.io',
+      expiresAt: null,
+      customSlug: 'promo2026',
+    })
+    expect(await screen.findByText('promo2026')).toBeTruthy()
+    expect(slugInput.value).toBe('')
+  })
+
+  it('menampilkan pesan error server saat alias kustom ditolak atau konflik', async () => {
+    const { client, linksApi } = makeClient()
+    linksApi.create.mockRejectedValueOnce(new ApiError("Custom slug 'promo2026' sudah digunakan.", 409))
+    renderPage(client)
+
+    await userEvent.type(screen.getByLabelText('URL Baru'), 'https://promo.io')
+    await userEvent.type(screen.getByLabelText('Alias Kustom (opsional)'), 'promo2026')
+    await userEvent.click(screen.getByRole('button', { name: /buat/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain("Custom slug 'promo2026' sudah digunakan.")
   })
 })
