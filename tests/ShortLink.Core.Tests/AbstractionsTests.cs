@@ -14,6 +14,7 @@ public class AbstractionsTests
             typeof(IUrlValidator),
             typeof(IClock),
             typeof(IShortLinkRepository),
+            typeof(IShortLinkClickCounter),
             typeof(IClickRepository),
             typeof(IUserRepository),
         };
@@ -77,5 +78,18 @@ public class AbstractionsTests
         Assert.Contains(nameof(IUserRepository.GetByUsernameAsync), members);
         Assert.Contains(nameof(IUserRepository.GetByEmailAsync), members);
         Assert.Contains(nameof(IUserRepository.AddAsync), members);
+    }
+
+    [Fact]
+    public void IShortLinkClickCounter_DeclaresIncrementClickCountAsyncWithCancellationToken()
+    {
+        var method = typeof(IShortLinkClickCounter).GetMethod(nameof(IShortLinkClickCounter.IncrementClickCountAsync));
+
+        Assert.NotNull(method);
+        var parameters = method!.GetParameters();
+        Assert.Equal(3, parameters.Length);
+        Assert.Equal(typeof(Guid), parameters[0].ParameterType);
+        Assert.Equal(typeof(long), parameters[1].ParameterType);
+        Assert.Equal(typeof(CancellationToken), parameters[2].ParameterType);
     }
 }

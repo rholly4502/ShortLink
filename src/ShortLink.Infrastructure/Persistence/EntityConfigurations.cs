@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ShortLink.Core;
 using ShortLink.Core.Entities;
 
 namespace ShortLink.Infrastructure.Persistence;
@@ -46,12 +47,12 @@ public sealed class ClickConfiguration : IEntityTypeConfiguration<Click>
     {
         b.ToTable("clicks");
         b.HasKey(x => x.Id);
-        b.Property(x => x.IpAddress).HasMaxLength(45);
-        b.Property(x => x.UserAgent).HasMaxLength(512);
-        b.Property(x => x.Referrer).HasMaxLength(2048);
-        b.Property(x => x.Country).HasMaxLength(2);
-        b.Property(x => x.Region).HasMaxLength(100);
-        b.Property(x => x.City).HasMaxLength(100);
+        b.Property(x => x.IpAddress).HasMaxLength(ClickIngestionService.MaxIpAddressLength);
+        b.Property(x => x.UserAgent).HasMaxLength(ClickIngestionService.MaxUserAgentLength);
+        b.Property(x => x.Referrer).HasMaxLength(ClickIngestionService.MaxReferrerLength);
+        b.Property(x => x.Country).HasMaxLength(ClickIngestionService.MaxCountryLength);
+        b.Property(x => x.Region).HasMaxLength(ClickIngestionService.MaxRegionLength);
+        b.Property(x => x.City).HasMaxLength(ClickIngestionService.MaxCityLength);
         b.Property(x => x.ClickedAt).IsRequired();
         b.HasIndex(x => new { x.ShortenedUrlId, x.ClickedAt });
     }

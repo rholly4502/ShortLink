@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IShortLinkRepository, ShortLinkRepository>();
+        services.AddScoped<IShortLinkClickCounter, ShortLinkRepository>();
         services.AddScoped<IClickRepository, ClickRepository>();
 
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();

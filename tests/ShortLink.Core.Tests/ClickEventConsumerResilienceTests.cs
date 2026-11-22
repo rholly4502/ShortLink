@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
@@ -333,6 +334,135 @@ public sealed class ClickEventConsumerResilienceTests
 
         await using var verifyCtx = new AppDbContext(dbOptions);
         Assert.Equal(1, await verifyCtx.Clicks.CountAsync(c => c.ShortenedUrlId == linkId));
+        var aggregates = await verifyCtx.ClickAggregates.Where(a => a.ShortenedUrlId == linkId).ToListAsync();
+        Assert.Equal(2, aggregates.Count);
+        Assert.All(aggregates, a => Assert.Equal(1L, a.Count));
+    }
+
+    [Fact]
+    public async Task ScopedClickEventHandler_WhenAggregationFailsThenRetrySucceeds_RollsBackAndIncrementsClickCountOnce()
+    {
+        await using var conn = new SqliteConnection("DataSource=:memory:");
+        await conn.OpenAsync();
+        var dbOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(conn).Options;
+
+        var ownerId = Guid.NewGuid();
+        var linkId = Guid.NewGuid();
+        await using (var setupCtx = new AppDbContext(dbOptions))
+        {
+            await setupCtx.Database.EnsureCreatedAsync();
+            await setupCtx.Users.AddAsync(new User
+            {
+                Id = ownerId,
+                Username = "worker-counter",
+                Email = "worker-counter@example.com",
+                PasswordHash = "hash",
+                CreatedAt = _clock.UtcNow
+            });
+            await setupCtx.ShortLinks.AddAsync(new ShortenedUrl
+            {
+                Id = linkId,
+                Slug = "cnt1",
+                Url = "https://example.com/cnt1",
+                OwnerId = ownerId,
+                CreatedAt = _clock.UtcNow
+            });
+            await setupCtx.SaveChangesAsync();
+        }
+
+        var upsertAttempt = 0;
+        var services = new ServiceCollection();
+        services.AddScoped(_ => new AppDbContext(dbOptions));
+        services.AddScoped<IShortLinkClickCounter, ShortLinkRepository>();
+        services.AddScoped<IClickRepository>(sp => new FailOnceUpsertClickRepository(
+            new ClickRepository(sp.GetRequiredService<AppDbContext>()),
+            () => Interlocked.Increment(ref upsertAttempt) == 1));
+        services.AddScoped<ClickIngestionService>();
+        services.AddScoped<ClickAggregationService>();
+        await using var provider = services.BuildServiceProvider();
+
+        var handler = new ScopedClickEventHandler(provider.GetRequiredService<IServiceScopeFactory>());
+        var delays = new List<TimeSpan>();
+        var dlq = new FakeDeadLetterPublisher();
+        var processor = CreateProcessor(handler, delays, new ClickConsumerOptions
+        {
+            MaxRetryAttempts = 2,
+            InitialRetryDelayMs = 250,
+            MaxRetryDelayMs = 1000
+        });
+
+        var evt = NewClickEvent(linkId);
+        var disposition = await processor.ProcessAsync(NewIncomingMessage(JsonSerializer.SerializeToUtf8Bytes(evt)), dlq);
+
+        Assert.Equal(MessageDisposition.Ack, disposition);
+        Assert.Equal(2, upsertAttempt);
+        Assert.Equal(new[] { TimeSpan.FromMilliseconds(250) }, delays);
+        Assert.Empty(dlq.Messages);
+
+        await using var verifyCtx = new AppDbContext(dbOptions);
+        Assert.Equal(1, await verifyCtx.Clicks.CountAsync(c => c.ShortenedUrlId == linkId));
+        var updatedLink = await verifyCtx.ShortLinks.SingleAsync(l => l.Id == linkId);
+        Assert.Equal(1L, updatedLink.ClickCount);
+        var aggregates = await verifyCtx.ClickAggregates.Where(a => a.ShortenedUrlId == linkId).ToListAsync();
+        Assert.Equal(2, aggregates.Count);
+        Assert.All(aggregates, a => Assert.Equal(1L, a.Count));
+    }
+
+    [Fact]
+    public async Task DiContainer_ResolvesClickIngestionServiceWithClickCounter_FromAddShortLinkPersistence()
+    {
+        await using var conn = new SqliteConnection("DataSource=:memory:");
+        await conn.OpenAsync();
+        var dbOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(conn).Options;
+
+        var ownerId = Guid.NewGuid();
+        var linkId = Guid.NewGuid();
+        await using (var setupCtx = new AppDbContext(dbOptions))
+        {
+            await setupCtx.Database.EnsureCreatedAsync();
+            await setupCtx.Users.AddAsync(new User
+            {
+                Id = ownerId,
+                Username = "worker-di",
+                Email = "worker-di@example.com",
+                PasswordHash = "hash",
+                CreatedAt = _clock.UtcNow
+            });
+            await setupCtx.ShortLinks.AddAsync(new ShortenedUrl
+            {
+                Id = linkId,
+                Slug = "di01",
+                Url = "https://example.com/di01",
+                OwnerId = ownerId,
+                CreatedAt = _clock.UtcNow
+            });
+            await setupCtx.SaveChangesAsync();
+        }
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Postgres"] = "Host=localhost;Database=shortlink;Username=shortlink"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddShortLinkPersistence(config);
+        services.RemoveAll<AppDbContext>();
+        services.AddScoped(_ => new AppDbContext(dbOptions));
+        services.AddScoped<ClickIngestionService>();
+        services.AddScoped<ClickAggregationService>();
+        services.AddSingleton<IClickEventHandler, ScopedClickEventHandler>();
+
+        await using var provider = services.BuildServiceProvider();
+        var handler = provider.GetRequiredService<IClickEventHandler>();
+
+        await handler.HandleAsync(NewClickEvent(linkId));
+
+        await using var verifyCtx = new AppDbContext(dbOptions);
+        Assert.Equal(1, await verifyCtx.Clicks.CountAsync(c => c.ShortenedUrlId == linkId));
+        var updatedLink = await verifyCtx.ShortLinks.SingleAsync(l => l.Id == linkId);
+        Assert.Equal(1L, updatedLink.ClickCount);
         var aggregates = await verifyCtx.ClickAggregates.Where(a => a.ShortenedUrlId == linkId).ToListAsync();
         Assert.Equal(2, aggregates.Count);
         Assert.All(aggregates, a => Assert.Equal(1L, a.Count));
