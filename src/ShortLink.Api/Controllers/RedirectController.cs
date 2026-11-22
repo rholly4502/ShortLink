@@ -16,17 +16,20 @@ public sealed class RedirectController : ControllerBase
     private readonly IClickEventPublisher _publisher;
     private readonly IClock _clock;
     private readonly ILogger<RedirectController>? _logger;
+    private readonly IUrlValidator _urlValidator;
 
     public RedirectController(
         CachedSlugResolver resolver,
         IClickEventPublisher publisher,
         IClock clock,
-        ILogger<RedirectController>? logger = null)
+        ILogger<RedirectController>? logger = null,
+        IUrlValidator? urlValidator = null)
     {
         _resolver = resolver;
         _publisher = publisher;
         _clock = clock;
         _logger = logger;
+        _urlValidator = urlValidator ?? new UrlValidator();
     }
 
     [HttpGet("{slug:regex(^[[a-zA-Z0-9]]+$):" + NonReservedSlugRouteConstraint.ConstraintName + "}")]
@@ -37,6 +40,15 @@ public sealed class RedirectController : ControllerBase
         var link = await _resolver.ResolveAsync(slug, ct);
         if (link is null)
             return NotFound();
+
+        if (!_urlValidator.TryNormalize(link.Url, out var safeTarget))
+        {
+            _logger?.LogWarning(
+                "Blocked unsafe redirect target for link '{LinkId}' (slug '{Slug}').",
+                link.Id,
+                slug);
+            return NotFound();
+        }
 
         var userAgent = Request.Headers.UserAgent.ToString();
         var clickEvent = new ClickEvent(
@@ -52,7 +64,7 @@ public sealed class RedirectController : ControllerBase
 
         await TryPublishClickAsync(clickEvent, slug, ct);
 
-        return Redirect(link.Url);
+        return Redirect(safeTarget.AbsoluteUri);
     }
 
     private async Task TryPublishClickAsync(ClickEvent clickEvent, string slug, CancellationToken ct)

@@ -30,7 +30,7 @@ public sealed class ShortenedUrlConfiguration : IEntityTypeConfiguration<Shorten
         b.ToTable("short_links");
         b.HasKey(x => x.Id);
         b.Property(x => x.Slug).IsRequired().HasMaxLength(32);
-        b.Property(x => x.Url).IsRequired().HasMaxLength(2048);
+        b.Property(x => x.Url).IsRequired().HasMaxLength(UrlValidator.MaxUrlLength);
         b.Property(x => x.OwnerId).IsRequired();
         b.Property(x => x.ClickCount).HasDefaultValue(0L);
         b.HasIndex(x => x.Slug).IsUnique();

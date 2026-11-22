@@ -1,14 +1,15 @@
 using System.ComponentModel.DataAnnotations;
+using ShortLink.Core;
 
 namespace ShortLink.Api.Models;
 
 public sealed record CreateLinkRequest(
-    [Required, StringLength(2048)] string Url,
+    [Required, StringLength(UrlValidator.MaxUrlLength)] string Url,
     DateTimeOffset? ExpiresAt,
     [StringLength(32)] string? CustomSlug = null);
 
 public sealed record UpdateLinkRequest(
-    [Required, StringLength(2048)] string Url,
+    [Required, StringLength(UrlValidator.MaxUrlLength)] string Url,
     DateTimeOffset? ExpiresAt);
 
 public sealed record LinkResponse(
