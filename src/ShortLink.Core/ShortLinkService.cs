@@ -71,7 +71,7 @@ public sealed class ShortLinkService
         {
             Id = Guid.NewGuid(),
             Slug = slug,
-            Url = normalized.ToString(),
+            Url = normalized.AbsoluteUri,
             OwnerId = ownerId,
             CreatedAt = _clock.UtcNow,
             ExpiresAt = expiresAt
@@ -129,7 +129,7 @@ public sealed class ShortLinkService
         if (link.OwnerId != ownerId)
             throw new UnauthorizedAccessException();
 
-        link.Url = normalized.ToString();
+        link.Url = normalized.AbsoluteUri;
         link.ExpiresAt = expiresAt;
         await _repository.UpdateAsync(link, ct);
         return link;

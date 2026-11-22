@@ -60,6 +60,25 @@ public class ShortLinkServiceTests
     }
 
     [Fact]
+    public async Task CreateAndUpdate_PersistsCanonicalAbsoluteUri_AndRejectsSsrfOrOverLength()
+    {
+        var ownerId = Guid.NewGuid();
+
+        var created = await _sut.CreateAsync(ownerId, "https://example.com/a%20b?x=%2F");
+        Assert.Equal("https://example.com/a%20b?x=%2F", created.Url);
+
+        var updated = await _sut.UpdateUrlAsync(ownerId, created.Id, "https://example.com/café", null);
+        Assert.Equal("https://example.com/caf%C3%A9", updated.Url);
+
+        var overLength = "https://example.com/" + new string('a', UrlValidator.MaxUrlLength);
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateAsync(ownerId, "http://postgres:5432/"));
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateAsync(ownerId, overLength));
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.UpdateUrlAsync(ownerId, created.Id, "http://[::127.0.0.1]/", null));
+        Assert.Single(_repo.Added);
+        Assert.Equal("https://example.com/caf%C3%A9", created.Url);
+    }
+
+    [Fact]
     public async Task Create_WithExpiry_SetsExpiresAt()
     {
         var expires = _clock.UtcNow.AddDays(30);

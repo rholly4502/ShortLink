@@ -124,6 +124,35 @@ public class RedirectControllerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => ctrl.RedirectTo("abc123", cts.Token));
     }
 
+    [Theory]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("http://169.254.169.254/latest/meta-data/")]
+    [InlineData("http://postgres:5432/")]
+    [InlineData("http://[::127.0.0.1]/")]
+    [InlineData("https://evil.com\\@example.com")]
+    public async Task RedirectTo_WhenStoredUrlUnsafe_ReturnsNotFoundAndPublishesNoEvent(string unsafeUrl)
+    {
+        _repo.BySlug["unsafe1"] = NewLink("unsafe1", url: unsafeUrl);
+        var ctrl = NewController();
+
+        var result = await ctrl.RedirectTo("unsafe1", default);
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.Empty(_publisher.Published);
+    }
+
+    [Fact]
+    public async Task RedirectTo_WhenCachedUrlUnsafe_ReturnsNotFoundAndPublishesNoEvent()
+    {
+        _cache.Links["cachedunsafe"] = NewLink("cachedunsafe", url: "http://redis:6379/");
+        var ctrl = NewController();
+
+        var result = await ctrl.RedirectTo("cachedunsafe", default);
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.Empty(_publisher.Published);
+    }
+
     private static ShortenedUrl NewLink(string slug, string? url = null, DateTimeOffset? expiresAt = null) => new()
     {
         Id = Guid.NewGuid(),
