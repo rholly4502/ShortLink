@@ -179,6 +179,58 @@ public class RepositoriesTests : IDisposable
         Assert.Equal(0, await ctx.ShortLinks.CountAsync());
     }
 
+    [Fact]
+    public async Task IncrementClickCount_IncrementsAtomicallyWithoutAffectingOtherLinks()
+    {
+        await using var ctx = CreateContext();
+        await ctx.Database.EnsureCreatedAsync();
+        var owner = NewUser("oInc");
+        var linkA = NewLink(owner, "incA");
+        var linkB = NewLink(owner, "incB");
+        await ctx.Users.AddAsync(owner);
+        await ctx.ShortLinks.AddRangeAsync(linkA, linkB);
+        await ctx.SaveChangesAsync();
+
+        var repo = new ShortLinkRepository(ctx);
+        await repo.IncrementClickCountAsync(linkA.Id);
+        await repo.IncrementClickCountAsync(linkA.Id, delta: 3);
+
+        var reloadedA = await ctx.ShortLinks.AsNoTracking().SingleAsync(l => l.Id == linkA.Id);
+        var reloadedB = await ctx.ShortLinks.AsNoTracking().SingleAsync(l => l.Id == linkB.Id);
+        Assert.Equal(4L, reloadedA.ClickCount);
+        Assert.Equal(0L, reloadedB.ClickCount);
+    }
+
+    [Fact]
+    public async Task IncrementClickCount_InvalidArguments_Throws()
+    {
+        await using var ctx = CreateContext();
+        await ctx.Database.EnsureCreatedAsync();
+        var repo = new ShortLinkRepository(ctx);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => repo.IncrementClickCountAsync(Guid.Empty));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repo.IncrementClickCountAsync(Guid.NewGuid(), delta: 0));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repo.IncrementClickCountAsync(Guid.NewGuid(), delta: -5));
+    }
+
+    [Fact]
+    public async Task IncrementClickCount_UnknownLinkId_CompletesWithoutThrowing()
+    {
+        await using var ctx = CreateContext();
+        await ctx.Database.EnsureCreatedAsync();
+        var owner = NewUser("oUnknown");
+        var link = NewLink(owner, "known1");
+        await ctx.Users.AddAsync(owner);
+        await ctx.ShortLinks.AddAsync(link);
+        await ctx.SaveChangesAsync();
+
+        var repo = new ShortLinkRepository(ctx);
+        await repo.IncrementClickCountAsync(Guid.NewGuid());
+
+        var reloaded = await ctx.ShortLinks.AsNoTracking().SingleAsync(l => l.Id == link.Id);
+        Assert.Equal(0L, reloaded.ClickCount);
+    }
+
     // ---- IClickRepository ----
 
     private static Click NewClick(ShortenedUrl link) => new()

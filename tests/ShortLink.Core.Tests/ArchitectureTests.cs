@@ -166,6 +166,7 @@ public sealed class ArchitectureTests
         Assert.Contains(typeof(IClickEventPublisher), parameterTypes);
         Assert.DoesNotContain(typeof(AppDbContext), parameterTypes);
         Assert.DoesNotContain(typeof(IShortLinkRepository), parameterTypes);
+        Assert.DoesNotContain(typeof(IShortLinkClickCounter), parameterTypes);
         Assert.DoesNotContain(typeof(ShortLinkService), parameterTypes);
     }
 
