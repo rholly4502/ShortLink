@@ -110,9 +110,18 @@ public sealed class RateLimitIntegrationTests
         {
             Content = JsonContent.Create(new LoginRequest("nobody", "wrong-pass"))
         };
-        thirdReq.Headers.Add("X-Forwarded-For", "203.0.113.50, 10.0.0.1");
+        thirdReq.Headers.Add("X-Forwarded-For", "198.51.100.99, 203.0.113.50");
         var thirdRes = await harness.Client.SendAsync(thirdReq);
         Assert.Equal(HttpStatusCode.TooManyRequests, thirdRes.StatusCode);
+
+        // Client attempting to rotate leftmost X-Forwarded-For IP while proxy appends real IP is still blocked.
+        using var spoofedReq = new HttpRequestMessage(HttpMethod.Post, "/auth/login")
+        {
+            Content = JsonContent.Create(new LoginRequest("nobody", "wrong-pass"))
+        };
+        spoofedReq.Headers.Add("X-Forwarded-For", "198.51.100.123, 203.0.113.50");
+        var spoofedRes = await harness.Client.SendAsync(spoofedReq);
+        Assert.Equal(HttpStatusCode.TooManyRequests, spoofedRes.StatusCode);
 
         using var malformedReq = new HttpRequestMessage(HttpMethod.Post, "/auth/login")
         {
@@ -123,7 +132,8 @@ public sealed class RateLimitIntegrationTests
         Assert.Equal(HttpStatusCode.Unauthorized, malformedRes.StatusCode);
 
         Assert.DoesNotContain(harness.Redis.Counts.Keys, k => k.Contains("injected", StringComparison.Ordinal));
-        Assert.Equal(3L, harness.Redis.Counts["rl:auth:203.0.113.50"]);
+        Assert.DoesNotContain(harness.Redis.Counts.Keys, k => k.Contains("198.51.100.", StringComparison.Ordinal));
+        Assert.Equal(4L, harness.Redis.Counts["rl:auth:203.0.113.50"]);
     }
 
     [Fact]

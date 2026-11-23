@@ -9,7 +9,7 @@ namespace ShortLink.Api.Middleware;
 
 public sealed class RedisRateLimitMiddleware
 {
-    private const int MaxIpHeaderLength = 45;
+    public const int MaxIpHeaderLength = 45;
 
     private static readonly ReadOnlyMemory<byte> TooManyRequestsBody = JsonSerializer.SerializeToUtf8Bytes(
         new ApiError("Terlalu banyak permintaan. Coba lagi nanti."),
@@ -88,37 +88,147 @@ public sealed class RedisRateLimitMiddleware
         return ("redirect", _options.RedirectLimit, _options.RedirectWindow);
     }
 
-    private static string GetClientKey(HttpContext context)
+    private string GetClientKey(HttpContext context)
     {
-        var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (TryNormalizeForwardedIp(forwarded, out var forwardedIp))
-            return forwardedIp;
+        if (TryExtractClientIp(context, _options.TrustForwardedHeaders, out var ip))
+            return ip;
 
-        return context.Connection.RemoteIpAddress is { } remoteIp
-            ? CanonicalizeIp(remoteIp)
-            : "unknown";
+        return "unknown";
     }
 
-    private static bool TryNormalizeForwardedIp(string? headerValue, out string normalizedIp)
+    public static string? ResolveClientIp(HttpContext context, bool trustForwardedHeaders = true)
+        => TryExtractClientIp(context, trustForwardedHeaders, out var ip) ? ip : null;
+
+    public static bool TryExtractClientIp(HttpContext context, bool trustForwardedHeaders, out string normalizedIp)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        normalizedIp = string.Empty;
+
+        var remoteIp = context.Connection.RemoteIpAddress;
+        var canTrustForwarded = trustForwardedHeaders && (remoteIp is null || IsTrustedProxyIp(remoteIp));
+
+        if (canTrustForwarded)
+        {
+            var forwarded = context.Request.Headers["X-Forwarded-For"].LastOrDefault();
+            if (TryNormalizeForwardedIp(forwarded, out normalizedIp))
+                return true;
+        }
+
+        if (remoteIp is not null)
+        {
+            normalizedIp = CanonicalizeIp(remoteIp);
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool IsTrustedProxyIp(IPAddress ip)
+    {
+        ArgumentNullException.ThrowIfNull(ip);
+
+        if (ip.IsIPv4MappedToIPv6)
+            return IsTrustedProxyIpv4(ip.MapToIPv4().GetAddressBytes());
+
+        if (IPAddress.IsLoopback(ip))
+            return true;
+
+        if (ip.AddressFamily == AddressFamily.InterNetwork)
+            return IsTrustedProxyIpv4(ip.GetAddressBytes());
+
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal)
+                return true;
+
+            ReadOnlySpan<byte> b = ip.GetAddressBytes();
+            return (b[0] & 0xFE) == 0xFC; // fc00::/7 Unique Local Address
+        }
+
+        return false;
+    }
+
+    private static bool IsTrustedProxyIpv4(ReadOnlySpan<byte> b)
+        => b[0] == 127                                   // 127.0.0.0/8 loopback
+           || b[0] == 10                                 // 10.0.0.0/8 RFC 1918
+           || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)  // 172.16.0.0/12 RFC 1918 (includes Docker bridge)
+           || (b[0] == 192 && b[1] == 168)               // 192.168.0.0/16 RFC 1918
+           || (b[0] == 100 && (b[1] & 0xC0) == 64)       // 100.64.0.0/10 CGNAT / service mesh
+           || (b[0] == 169 && b[1] == 254);              // 169.254.0.0/16 link-local
+
+    public static bool TryNormalizeForwardedIp(string? headerValue, out string normalizedIp)
     {
         normalizedIp = string.Empty;
         if (string.IsNullOrWhiteSpace(headerValue))
             return false;
 
         var span = headerValue.AsSpan();
-        var commaIndex = span.IndexOf(',');
-        if (commaIndex >= 0)
-            span = span[..commaIndex];
+        var lastComma = span.LastIndexOf(',');
+        if (lastComma >= 0)
+            span = span[(lastComma + 1)..];
 
         span = span.Trim();
-        if (span.IsEmpty || span.Length > MaxIpHeaderLength || span.Contains('%'))
+        if (span.IsEmpty || span.Length > MaxIpHeaderLength)
             return false;
+
+        foreach (var ch in span)
+        {
+            if (!IsValidIpTokenChar(ch))
+                return false;
+        }
 
         if (!IPAddress.TryParse(span, out var ip))
             return false;
 
+        if (!IsStrictCanonicalIpToken(span, ip))
+            return false;
+
         normalizedIp = CanonicalizeIp(ip);
         return true;
+    }
+
+    private static bool IsValidIpTokenChar(char ch)
+        => char.IsAsciiHexDigit(ch) || ch is '.' or ':';
+
+    private static bool IsStrictCanonicalIpToken(ReadOnlySpan<char> token, IPAddress parsed)
+    {
+        if (parsed.AddressFamily == AddressFamily.InterNetwork)
+        {
+            // Tolak bentuk non-standar IPv4 (decimal integer, hex, octal leading zero, atau shorthand < 4 oktet)
+            // agar penyerang tidak dapat memalsukan atau mem-bypass rate limit dengan variasi format IPv4.
+            var dotCount = 0;
+            var segmentLen = 0;
+            var leadingZero = false;
+
+            foreach (var ch in token)
+            {
+                if (ch == '.')
+                {
+                    if (segmentLen == 0)
+                        return false;
+                    dotCount++;
+                    segmentLen = 0;
+                    leadingZero = false;
+                    continue;
+                }
+
+                if (!char.IsAsciiDigit(ch))
+                    return false;
+
+                if (segmentLen == 0 && ch == '0')
+                    leadingZero = true;
+                else if (leadingZero)
+                    return false;
+
+                segmentLen++;
+                if (segmentLen > 3)
+                    return false;
+            }
+
+            return dotCount == 3 && segmentLen > 0;
+        }
+
+        return parsed.AddressFamily == AddressFamily.InterNetworkV6 && token.Contains(':');
     }
 
     private static string CanonicalizeIp(IPAddress ip)
