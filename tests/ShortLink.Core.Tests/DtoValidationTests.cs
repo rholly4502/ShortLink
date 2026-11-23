@@ -54,6 +54,14 @@ public class DtoValidationTests
     public void Login_InvalidPayload_Fails(string? i, string? p) =>
         Assert.False(IsValid(new LoginRequest(i!, p!)));
 
+    [Fact]
+    public void Login_OversizedPassword_Fails() =>
+        Assert.False(IsValid(new LoginRequest("user01", new string('a', 73))));
+
+    [Fact]
+    public void Register_OversizedPassword_Fails() =>
+        Assert.False(IsValid(new RegisterRequest("user01", "user@example.com", new string('a', 73))));
+
     // --- Refresh ---
 
     [Fact]
@@ -61,6 +69,10 @@ public class DtoValidationTests
 
     [Fact]
     public void Refresh_MissingToken_Fails() => Assert.False(IsValid(new RefreshRequest(null!)));
+
+    [Fact]
+    public void Refresh_OversizedToken_Fails() =>
+        Assert.False(IsValid(new RefreshRequest(new string('a', 4097))));
 
     // --- CreateLink / UpdateLink ---
 

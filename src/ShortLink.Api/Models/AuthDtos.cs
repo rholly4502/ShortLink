@@ -1,18 +1,20 @@
 using System.ComponentModel.DataAnnotations;
+using ShortLink.Core;
+using ShortLink.Infrastructure.Security;
 
 namespace ShortLink.Api.Models;
 
 public sealed record RegisterRequest(
-    [Required, StringLength(50, MinimumLength = 3)] string Username,
-    [Required, EmailAddress, StringLength(254)] string Email,
-    [Required, StringLength(128, MinimumLength = 8)] string Password);
+    [Required, StringLength(AuthService.MaxUsernameLength, MinimumLength = 3)] string Username,
+    [Required, EmailAddress, StringLength(AuthService.MaxEmailLength)] string Email,
+    [Required, StringLength(AuthService.MaxPasswordBytes, MinimumLength = 8)] string Password);
 
 public sealed record LoginRequest(
-    [Required, StringLength(254)] string Identifier,
-    [Required] string Password);
+    [Required, StringLength(AuthService.MaxEmailLength)] string Identifier,
+    [Required, StringLength(AuthService.MaxPasswordBytes)] string Password);
 
 public sealed record RefreshRequest(
-    [Required] string RefreshToken);
+    [Required, StringLength(JwtTokenService.MaxTokenLength)] string RefreshToken);
 
 public sealed record UserResponse(Guid Id, string Username, string Email, string Role);
 

@@ -22,7 +22,7 @@ public sealed class AuthController : ControllerBase
             var user = await _auth.RegisterAsync(request.Username, request.Email, request.Password, ct);
             return CreatedAtAction(nameof(Register), new UserResponse(user.Id, user.Username, user.Email, user.Role.ToString()));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return ErrorMapper.Result<UserResponse>(ex);
         }
