@@ -12,6 +12,7 @@ public sealed class RateLimitOptions
     public int ApiWindowSeconds { get; set; } = 60;
     public int RedirectLimit { get; set; } = 30;
     public int RedirectWindowSeconds { get; set; } = 60;
+    public bool TrustForwardedHeaders { get; set; } = true;
 
     public TimeSpan AuthWindow => TimeSpan.FromSeconds(Math.Max(1, AuthWindowSeconds));
     public TimeSpan CreateWindow => TimeSpan.FromSeconds(Math.Max(1, CreateWindowSeconds));

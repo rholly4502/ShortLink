@@ -254,15 +254,87 @@ public class RedisRateLimitMiddlewareTests
     }
 
     [Fact]
-    public async Task Invoke_UsesXForwardedFor_WhenPresent()
+    public async Task Invoke_UsesXForwardedFor_RightmostEntry_WhenRemoteIpIsTrustedProxy()
     {
         var (mw, store, _) = Build();
-        var ctx = NewApiContext();
-        ctx.Request.Headers["X-Forwarded-For"] = "203.0.113.9, 10.0.0.1";
+        var ctx = NewApiContext(ip: "127.0.0.1");
+        ctx.Request.Headers["X-Forwarded-For"] = "198.51.100.99, 203.0.113.9";
 
         await mw.InvokeAsync(ctx);
 
         Assert.Contains("rl:api:203.0.113.9", store.Counts.Keys);
+        Assert.DoesNotContain("rl:api:198.51.100.99", store.Counts.Keys);
+    }
+
+    [Fact]
+    public async Task Invoke_IgnoresXForwardedFor_WhenRemoteIpIsUntrustedPublicPeer()
+    {
+        var (mw, store, nextCalled) = Build();
+        var ctx = NewApiContext(ip: "1.2.3.4");
+        ctx.Request.Headers["X-Forwarded-For"] = "203.0.113.9";
+
+        await mw.InvokeAsync(ctx);
+
+        Assert.True(nextCalled());
+        Assert.Equal(1L, store.Counts["rl:api:1.2.3.4"]);
+        Assert.DoesNotContain("rl:api:203.0.113.9", store.Counts.Keys);
+    }
+
+    [Fact]
+    public async Task Invoke_IgnoresXForwardedFor_WhenTrustForwardedHeadersIsFalse()
+    {
+        var store = new FakeRedisStringStore();
+        var options = new RateLimitOptions
+        {
+            ApiLimit = ApiLimit,
+            ApiWindowSeconds = 60,
+            TrustForwardedHeaders = false
+        };
+        var mw = new RedisRateLimitMiddleware(_ => Task.CompletedTask, new FixedWindowRateLimiter(store), options);
+        var ctx = NewApiContext(ip: "127.0.0.1");
+        ctx.Request.Headers["X-Forwarded-For"] = "203.0.113.9";
+
+        await mw.InvokeAsync(ctx);
+
+        Assert.Equal(1L, store.Counts["rl:api:127.0.0.1"]);
+        Assert.DoesNotContain("rl:api:203.0.113.9", store.Counts.Keys);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", true)]
+    [InlineData("::1", true)]
+    [InlineData("10.0.0.5", true)]
+    [InlineData("172.18.0.2", true)]
+    [InlineData("192.168.1.10", true)]
+    [InlineData("100.64.0.1", true)]
+    [InlineData("169.254.1.1", true)]
+    [InlineData("::ffff:172.18.0.2", true)]
+    [InlineData("fe80::1", true)]
+    [InlineData("fd00::1", true)]
+    [InlineData("1.2.3.4", false)]
+    [InlineData("203.0.113.9", false)]
+    [InlineData("::ffff:203.0.113.9", false)]
+    [InlineData("2001:db8::1", false)]
+    public void IsTrustedProxyIp_IdentifiesLoopbackAndPrivatePeers(string ipString, bool expected)
+    {
+        Assert.Equal(expected, RedisRateLimitMiddleware.IsTrustedProxyIp(IPAddress.Parse(ipString)));
+    }
+
+    [Fact]
+    public async Task Invoke_MultipleXForwardedForHeaders_UsesLastHeaderRightmostIp_PreventingClientRotation()
+    {
+        var (mw, store, _) = Build();
+
+        for (var i = 1; i <= 3; i++)
+        {
+            var ctx = NewRequestContext(HttpMethods.Post, "/auth/login", ip: "172.18.0.2");
+            ctx.Request.Headers.Append("X-Forwarded-For", $"198.51.100.{i}");
+            ctx.Request.Headers.Append("X-Forwarded-For", "203.0.113.55");
+            await mw.InvokeAsync(ctx);
+        }
+
+        Assert.Equal(3L, store.Counts["rl:auth:203.0.113.55"]);
+        Assert.DoesNotContain(store.Counts.Keys, k => k.Contains("198.51.100.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -412,17 +484,23 @@ public class RedisRateLimitMiddlewareTests
     [InlineData("203.0.113.9:8080")]
     [InlineData("2001:db8::1%eth0")]
     [InlineData("2001:db8::1%123")]
+    [InlineData("2130706433")]
+    [InlineData("0x7f000001")]
+    [InlineData("0177.0.0.1")]
+    [InlineData("203.0.113.09")]
+    [InlineData("127.1")]
+    [InlineData("127.0.1")]
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public async Task Invoke_MalformedOrInjectedXForwardedFor_FallsBackToRemoteIp(string headerValue)
     {
         var (mw, store, nextCalled) = Build();
-        var ctx = NewRequestContext(HttpMethods.Get, "/api/links", "1.2.3.4");
+        var ctx = NewRequestContext(HttpMethods.Get, "/api/links", "127.0.0.1");
         ctx.Request.Headers["X-Forwarded-For"] = headerValue;
 
         await mw.InvokeAsync(ctx);
 
         Assert.True(nextCalled());
-        Assert.Equal(1L, store.Counts["rl:api:1.2.3.4"]);
+        Assert.Equal(1L, store.Counts["rl:api:127.0.0.1"]);
         Assert.DoesNotContain(store.Counts.Keys, k => k.Contains(headerValue, StringComparison.Ordinal));
     }
 
@@ -431,21 +509,21 @@ public class RedisRateLimitMiddlewareTests
     {
         var (mw, store, _) = Build();
 
-        var v6Expanded = NewRequestContext(HttpMethods.Get, "/api/links");
-        v6Expanded.Request.Headers["X-Forwarded-For"] = "2001:0DB8:0000:0000:0000:0000:0000:0001, 10.0.0.1";
+        var v6Expanded = NewRequestContext(HttpMethods.Get, "/api/links", "127.0.0.1");
+        v6Expanded.Request.Headers["X-Forwarded-For"] = "198.51.100.1, 2001:0DB8:0000:0000:0000:0000:0000:0001";
         await mw.InvokeAsync(v6Expanded);
 
-        var v6Compressed = NewRequestContext(HttpMethods.Get, "/api/links");
+        var v6Compressed = NewRequestContext(HttpMethods.Get, "/api/links", "127.0.0.1");
         v6Compressed.Request.Headers["X-Forwarded-For"] = "2001:db8::1";
         await mw.InvokeAsync(v6Compressed);
 
         Assert.Equal(2L, store.Counts["rl:api:2001:db8::1"]);
 
-        var mappedV4 = NewRequestContext(HttpMethods.Get, "/api/links");
+        var mappedV4 = NewRequestContext(HttpMethods.Get, "/api/links", "127.0.0.1");
         mappedV4.Request.Headers["X-Forwarded-For"] = "::ffff:203.0.113.9";
         await mw.InvokeAsync(mappedV4);
 
-        var plainV4 = NewRequestContext(HttpMethods.Get, "/api/links");
+        var plainV4 = NewRequestContext(HttpMethods.Get, "/api/links", "127.0.0.1");
         plainV4.Request.Headers["X-Forwarded-For"] = "203.0.113.9";
         await mw.InvokeAsync(plainV4);
 

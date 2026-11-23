@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using ShortLink.Api.Middleware;
 using ShortLink.Api.Routing;
 using ShortLink.Core;
 using ShortLink.Core.Abstractions;
@@ -54,7 +55,7 @@ public sealed class RedirectController : ControllerBase
         var clickEvent = new ClickEvent(
             link.Id,
             _clock.UtcNow,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            RedisRateLimitMiddleware.ResolveClientIp(HttpContext),
             userAgent,
             Request.Headers.Referer.ToString(),
             DeviceTypeDetector.Detect(userAgent),

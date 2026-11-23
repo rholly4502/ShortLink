@@ -61,6 +61,31 @@ public class RedirectControllerTests
     }
 
     [Fact]
+    public async Task RedirectTo_BehindTrustedProxy_UsesCanonicalRightmostXForwardedForIp_AndIgnoresUntrustedPeerSpoofing()
+    {
+        var link = NewLink("abc123");
+        _repo.BySlug["abc123"] = link;
+
+        var proxiedCtrl = NewController(ctx =>
+        {
+            ctx.Connection.RemoteIpAddress = IPAddress.Parse("172.18.0.2");
+            ctx.Request.Headers["X-Forwarded-For"] = "198.51.100.99, ::ffff:203.0.113.42";
+        });
+        await proxiedCtrl.RedirectTo("abc123", default);
+
+        var directCtrl = NewController(ctx =>
+        {
+            ctx.Connection.RemoteIpAddress = IPAddress.Parse("::ffff:198.51.100.7");
+            ctx.Request.Headers["X-Forwarded-For"] = "203.0.113.42";
+        });
+        await directCtrl.RedirectTo("abc123", default);
+
+        Assert.Equal(2, _publisher.Published.Count);
+        Assert.Equal("203.0.113.42", _publisher.Published[0].IpAddress);
+        Assert.Equal("198.51.100.7", _publisher.Published[1].IpAddress);
+    }
+
+    [Fact]
     public async Task RedirectTo_SlugNotFound_ReturnsNotFoundAndNoEvent()
     {
         var ctrl = NewController();
