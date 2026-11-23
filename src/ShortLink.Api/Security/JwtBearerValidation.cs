@@ -1,20 +1,22 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using ShortLink.Core.Abstractions;
 using ShortLink.Infrastructure.Security;
 
 namespace ShortLink.Api.Security;
 
-/// <summary>Validasi tambahan untuk Bearer JWT agar hanya access token dengan subjek GUID valid yang diterima.</summary>
+/// <summary>Validasi tambahan untuk Bearer JWT agar hanya access token dengan subjek GUID valid dan user terdaftar yang diterima.</summary>
 public static class JwtBearerValidation
 {
-    public static Task ValidateAccessTokenAsync(TokenValidatedContext context)
+    public static async Task ValidateAccessTokenAsync(TokenValidatedContext context)
     {
         var principal = context.Principal;
         if (principal is null)
         {
             context.Fail("Missing principal.");
-            return Task.CompletedTask;
+            return;
         }
 
         var tokenTypes = principal.FindAll(JwtTokenService.TokenTypeClaim)
@@ -23,7 +25,7 @@ public static class JwtBearerValidation
         if (tokenTypes.Count != 1 || !string.Equals(tokenTypes[0], JwtTokenService.AccessTokenType, StringComparison.Ordinal))
         {
             context.Fail("Access token required.");
-            return Task.CompletedTask;
+            return;
         }
 
         var subject = principal.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -31,9 +33,18 @@ public static class JwtBearerValidation
         if (!Guid.TryParse(subject, out var userId) || userId == Guid.Empty)
         {
             context.Fail("Invalid token subject.");
-            return Task.CompletedTask;
+            return;
         }
 
-        return Task.CompletedTask;
+        var users = context.HttpContext.RequestServices.GetService<IUserRepository>();
+        if (users is not null)
+        {
+            var user = await users.GetByIdAsync(userId, context.HttpContext.RequestAborted);
+            if (user is null)
+            {
+                context.Fail("Token subject user does not exist.");
+                return;
+            }
+        }
     }
 }

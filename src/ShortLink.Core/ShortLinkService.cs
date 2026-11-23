@@ -118,16 +118,16 @@ public sealed class ShortLinkService
         if (ownerId == Guid.Empty)
             throw new UnauthorizedAccessException();
 
+        var link = await _repository.GetByIdAsync(id, ct)
+            ?? throw new KeyNotFoundException("Short link tidak ditemukan.");
+        if (link.OwnerId != ownerId)
+            throw new UnauthorizedAccessException();
+
         if (!_urlValidator.TryNormalize(url, out var normalized))
             throw new ArgumentException("URL tidak valid atau tidak aman.", nameof(url));
 
         if (expiresAt is { } expiry && expiry <= _clock.UtcNow)
             throw new ArgumentException("ExpiresAt harus berada di masa depan.", nameof(expiresAt));
-
-        var link = await _repository.GetByIdAsync(id, ct)
-            ?? throw new KeyNotFoundException("Short link tidak ditemukan.");
-        if (link.OwnerId != ownerId)
-            throw new UnauthorizedAccessException();
 
         link.Url = normalized.AbsoluteUri;
         link.ExpiresAt = expiresAt;
@@ -135,7 +135,7 @@ public sealed class ShortLinkService
         return link;
     }
 
-    public async Task DeleteByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct = default)
+    public async Task<ShortenedUrl> DeleteByOwnerAsync(Guid ownerId, Guid id, CancellationToken ct = default)
     {
         if (ownerId == Guid.Empty)
             throw new UnauthorizedAccessException();
@@ -146,6 +146,7 @@ public sealed class ShortLinkService
             throw new UnauthorizedAccessException();
 
         await _repository.DeleteAsync(link, ct);
+        return link;
     }
 
     /// <summary>Agregasi klik murni (tanpa dependensi infra) per periode/device/country.</summary>

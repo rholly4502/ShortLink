@@ -114,6 +114,50 @@ public sealed class JwtAuthIntegrationTests
     }
 
     [Fact]
+    public async Task ProtectedEndpoints_WithUnknownUserIdAccessToken_ReturnsUnauthorizedAndDoesNotCreateOrMutateLinks()
+    {
+        await using var harness = CreateHarness();
+        var alice = CreateUser("alice", "alice@example.com");
+        harness.Users.Add(alice);
+        var aliceLink = new ShortenedUrl
+        {
+            Id = Guid.NewGuid(),
+            Slug = "alice01",
+            Url = "https://example.com/alice",
+            OwnerId = alice.Id,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        await harness.Links.AddAsync(aliceLink);
+
+        var ghostUser = CreateUser("ghost", "ghost@example.com");
+        var ghostTokens = harness.Tokens.Generate(ghostUser);
+
+        using var listReq = new HttpRequestMessage(HttpMethod.Get, "/api/links");
+        listReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ghostTokens.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await harness.Client.SendAsync(listReq)).StatusCode);
+
+        using var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/links")
+        {
+            Content = JsonContent.Create(new CreateLinkRequest("https://example.com/ghost", null))
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ghostTokens.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await harness.Client.SendAsync(createReq)).StatusCode);
+        Assert.Single(harness.Links.ById);
+
+        using var putReq = new HttpRequestMessage(HttpMethod.Put, $"/api/links/{aliceLink.Id}")
+        {
+            Content = JsonContent.Create(new UpdateLinkRequest("https://example.org/hijack", null))
+        };
+        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ghostTokens.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await harness.Client.SendAsync(putReq)).StatusCode);
+
+        using var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/api/links/{aliceLink.Id}");
+        delReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ghostTokens.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await harness.Client.SendAsync(delReq)).StatusCode);
+        Assert.True(harness.Links.ById.ContainsKey(aliceLink.Id));
+    }
+
+    [Fact]
     public async Task LinksEndpoints_CrossUserOwnership_EnforcedEndToEnd()
     {
         await using var harness = CreateHarness();
@@ -153,6 +197,18 @@ public sealed class JwtAuthIntegrationTests
         using var bobAnalyticsReq = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{created.Id}/analytics");
         bobAnalyticsReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bobTokens.AccessToken);
         Assert.Equal(HttpStatusCode.NotFound, (await harness.Client.SendAsync(bobAnalyticsReq)).StatusCode);
+
+        using var bobCsvReq = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{created.Id}/analytics/csv");
+        bobCsvReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bobTokens.AccessToken);
+        Assert.Equal(HttpStatusCode.NotFound, (await harness.Client.SendAsync(bobCsvReq)).StatusCode);
+
+        // Non-owner PUT with invalid URL or past expiry still returns 404 NotFound (no existence oracle via 400 BadRequest).
+        using var bobPutInvalidUrlReq = new HttpRequestMessage(HttpMethod.Put, $"/api/links/{created.Id}")
+        {
+            Content = JsonContent.Create(new UpdateLinkRequest("javascript:alert(1)", DateTimeOffset.UtcNow.AddDays(-1)))
+        };
+        bobPutInvalidUrlReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bobTokens.AccessToken);
+        Assert.Equal(HttpStatusCode.NotFound, (await harness.Client.SendAsync(bobPutInvalidUrlReq)).StatusCode);
 
         using var aliceGetReq = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{created.Id}");
         aliceGetReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", aliceTokens.AccessToken);
