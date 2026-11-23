@@ -131,6 +131,24 @@ public sealed class JwtTokenServiceTests
         Assert.Null(Create().ValidateRefreshToken(token));
     }
 
+    [Fact]
+    public void ValidateRefreshToken_ReturnsNull_WhenDuplicateTokenTypeClaimsPresent()
+    {
+        var token = WriteCustomJwt(
+            new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()),
+            new Claim(JwtTokenService.TokenTypeClaim, JwtTokenService.AccessTokenType),
+            new Claim(JwtTokenService.TokenTypeClaim, JwtTokenService.RefreshTokenType));
+
+        Assert.Null(Create().ValidateRefreshToken(token));
+    }
+
+    [Fact]
+    public void ValidateRefreshToken_ReturnsNull_WhenOversized()
+    {
+        var oversized = new string('a', JwtTokenService.MaxTokenLength + 1);
+        Assert.Null(Create().ValidateRefreshToken(oversized));
+    }
+
     private static string WriteCustomJwt(params Claim[] claims)
     {
         var now = DateTime.UtcNow;

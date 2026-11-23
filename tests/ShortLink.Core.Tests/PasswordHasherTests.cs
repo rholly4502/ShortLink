@@ -26,4 +26,27 @@ public sealed class PasswordHasherTests
     {
         Assert.NotEqual(_hasher.Hash("same"), _hasher.Hash("same"));
     }
+
+    [Fact]
+    public void Hash_Throws_WhenPasswordExceeds72Utf8Bytes()
+    {
+        var valid72 = new string('a', 72);
+        var hash = _hasher.Hash(valid72);
+        Assert.True(_hasher.Verify(hash, valid72));
+
+        Assert.Throws<ArgumentException>(() => _hasher.Hash(new string('a', 73)));
+        Assert.Throws<ArgumentException>(() => _hasher.Hash(new string('€', 25)));
+    }
+
+    [Fact]
+    public void Verify_Rejects73BytePrefixExtensionAndMalformedHashGracefully()
+    {
+        var valid72 = new string('a', 72);
+        var hash = _hasher.Hash(valid72);
+
+        // Cegah silent truncation BCrypt di mana karakter ke-73+ diabaikan
+        Assert.False(_hasher.Verify(hash, valid72 + "EXTRA"));
+        Assert.False(_hasher.Verify("not-a-valid-bcrypt-hash", "s3cret!"));
+        Assert.False(_hasher.Verify("", "s3cret!"));
+    }
 }

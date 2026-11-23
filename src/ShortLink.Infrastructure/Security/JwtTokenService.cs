@@ -14,6 +14,7 @@ public sealed class JwtTokenService : IAuthTokenService
     public const string TokenTypeClaim = "token_type";
     public const string RefreshTokenType = "refresh";
     public const string AccessTokenType = "access";
+    public const int MaxTokenLength = 4096;
 
     private readonly JwtOptions _o;
 
@@ -33,23 +34,33 @@ public sealed class JwtTokenService : IAuthTokenService
 
     public Guid? ValidateRefreshToken(string refreshToken)
     {
-        if (string.IsNullOrWhiteSpace(refreshToken))
+        if (string.IsNullOrWhiteSpace(refreshToken) || refreshToken.Length > MaxTokenLength)
             return null;
 
         try
         {
-            var principal = new JwtSecurityTokenHandler().ValidateToken(refreshToken, NewValidationParameters(), out var validated);
+            _ = new JwtSecurityTokenHandler().ValidateToken(refreshToken, NewValidationParameters(), out var validated);
             if (validated is not JwtSecurityToken jwt
-                || !jwt.Payload.TryGetValue(TokenTypeClaim, out var tokenType)
-                || !string.Equals(tokenType?.ToString(), RefreshTokenType, StringComparison.Ordinal))
+                || !string.Equals(jwt.Header.Alg, SecurityAlgorithms.HmacSha256, StringComparison.Ordinal))
             {
                 return null;
             }
 
-            if (!jwt.Payload.TryGetValue(JwtRegisteredClaimNames.Sub, out var sub))
+            var tokenTypes = jwt.Claims
+                .Where(c => c.Type == TokenTypeClaim)
+                .Select(c => c.Value)
+                .ToList();
+            if (tokenTypes.Count != 1 || !string.Equals(tokenTypes[0], RefreshTokenType, StringComparison.Ordinal))
                 return null;
 
-            return Guid.TryParse(sub?.ToString(), out var id) && id != Guid.Empty ? id : null;
+            var subjects = jwt.Claims
+                .Where(c => c.Type == JwtRegisteredClaimNames.Sub)
+                .Select(c => c.Value)
+                .ToList();
+            if (subjects.Count != 1)
+                return null;
+
+            return Guid.TryParse(subjects[0], out var id) && id != Guid.Empty ? id : null;
         }
         catch
         {
@@ -66,6 +77,7 @@ public sealed class JwtTokenService : IAuthTokenService
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = SigningKey(),
+        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
         ClockSkew = TimeSpan.Zero
     };
 

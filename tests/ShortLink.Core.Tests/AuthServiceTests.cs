@@ -31,8 +31,19 @@ public sealed class AuthServiceTests
 
     private sealed class FakeHasher : IPasswordHasher
     {
+        public int VerifyCallCount { get; private set; }
+        public string? LastVerifiedHash { get; private set; }
+        public string? LastVerifiedPassword { get; private set; }
+
         public string Hash(string password) => "h:" + password;
-        public bool Verify(string hashed, string password) => hashed == "h:" + password;
+
+        public bool Verify(string hashed, string password)
+        {
+            VerifyCallCount++;
+            LastVerifiedHash = hashed;
+            LastVerifiedPassword = password;
+            return hashed == "h:" + password;
+        }
     }
 
     private sealed class FakeTokenService : IAuthTokenService
@@ -49,11 +60,12 @@ public sealed class AuthServiceTests
     }
 
     private readonly FakeUserRepository _users = new();
+    private readonly FakeHasher _hasher = new();
     private readonly AuthService _svc;
 
     public AuthServiceTests()
     {
-        _svc = new AuthService(_users, new FakeHasher(), new FakeTokenService(), new FakeClock());
+        _svc = new AuthService(_users, _hasher, new FakeTokenService(), new FakeClock());
     }
 
     [Fact]
@@ -141,5 +153,71 @@ public sealed class AuthServiceTests
         var svc = new AuthService(_users, new FakeHasher(), tokenSvc, new FakeClock());
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.RefreshAsync("valid-refresh"));
+    }
+
+    [Fact]
+    public async Task Register_ChecksDuplicateAfterTrimmingUsernameAndEmail()
+    {
+        await _svc.RegisterAsync("alice", "alice@x.com", "secret");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _svc.RegisterAsync("  alice  ", "other@x.com", "pw"));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _svc.RegisterAsync("bob", "  alice@x.com  ", "pw"));
+    }
+
+    [Theory]
+    [InlineData("alice smith", "a@x.com", "secret")]
+    [InlineData("alice\nbob", "a@x.com", "secret")]
+    [InlineData("alice", "a b@x.com", "secret")]
+    [InlineData("alice", "a@x.com", "sec\0ret")]
+    public async Task Register_Throws_WhenFieldsContainInternalWhitespaceOrControlChars(
+        string username,
+        string email,
+        string password)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _svc.RegisterAsync(username, email, password));
+    }
+
+    [Fact]
+    public async Task Register_Throws_WhenPasswordExceeds72Utf8Bytes()
+    {
+        var exactly72Ascii = new string('a', 72);
+        var user = await _svc.RegisterAsync("alice72", "alice72@x.com", exactly72Ascii);
+        Assert.Equal("alice72", user.Username);
+
+        var over72Ascii = new string('a', 73);
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _svc.RegisterAsync("bob73", "bob73@x.com", over72Ascii));
+
+        // 25 3-byte UTF-8 characters = 75 bytes (> 72 byte BCrypt limit despite 25 chars)
+        var over72MultiByte = new string('€', 25);
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _svc.RegisterAsync("carol75", "carol75@x.com", over72MultiByte));
+    }
+
+    [Fact]
+    public async Task Login_UnknownUser_StillInvokesPasswordHasherToMitigateTimingEnumeration()
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _svc.LoginAsync("ghost", "secret"));
+
+        Assert.Equal(1, _hasher.VerifyCallCount);
+        Assert.Equal("secret", _hasher.LastVerifiedPassword);
+    }
+
+    [Fact]
+    public async Task Login_TrimsIdentifier_AndRejectsOversizedPasswordWithoutPassingFullBufferToHasher()
+    {
+        await _svc.RegisterAsync("alice", "alice@x.com", "secret");
+
+        var pair = await _svc.LoginAsync("  alice  ", "secret");
+        Assert.Equal("access-token", pair.AccessToken);
+
+        var beforeCalls = _hasher.VerifyCallCount;
+        var hugePassword = new string('x', 5000);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _svc.LoginAsync("alice", hugePassword));
+
+        Assert.Equal(beforeCalls + 1, _hasher.VerifyCallCount);
+        Assert.NotEqual(hugePassword, _hasher.LastVerifiedPassword);
     }
 }

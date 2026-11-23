@@ -81,6 +81,35 @@ public sealed class JwtAuthIntegrationTests
     }
 
     [Fact]
+    public async Task RegisterAndLogin_EndToEnd_EnforcesTrimmedUniquenessAndPasswordBounds()
+    {
+        await using var harness = CreateHarness();
+
+        var regRes = await harness.Client.PostAsJsonAsync(
+            "/auth/register",
+            new RegisterRequest("  alice01  ", "  alice01@example.com  ", "StrongPass!23"));
+        Assert.Equal(HttpStatusCode.Created, regRes.StatusCode);
+
+        // Pendaftaran duplikat dengan spasi pinggir wajib ditolak 409 Conflict
+        var dupRes = await harness.Client.PostAsJsonAsync(
+            "/auth/register",
+            new RegisterRequest("alice01", "other@example.com", "StrongPass!23"));
+        Assert.Equal(HttpStatusCode.Conflict, dupRes.StatusCode);
+
+        // Login dengan identifier berspasi pinggir tetap berhasil
+        var loginRes = await harness.Client.PostAsJsonAsync(
+            "/auth/login",
+            new LoginRequest("  alice01  ", "StrongPass!23"));
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+
+        // Password > 72 byte ditolak 400 BadRequest
+        var oversizedLoginRes = await harness.Client.PostAsJsonAsync(
+            "/auth/login",
+            new LoginRequest("alice01", new string('p', 73)));
+        Assert.Equal(HttpStatusCode.BadRequest, oversizedLoginRes.StatusCode);
+    }
+
+    [Fact]
     public async Task ProtectedEndpoint_WithTokenMissingTokenTypeClaim_ReturnsUnauthorized()
     {
         await using var harness = CreateHarness();
