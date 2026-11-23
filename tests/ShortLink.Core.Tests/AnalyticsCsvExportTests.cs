@@ -228,7 +228,7 @@ public sealed class AnalyticsCsvExportTests
     }
 
     [Fact]
-    public async Task Controller_ExportAnalyticsCsv_InvalidIdentity_ReturnsNotFound()
+    public async Task Controller_ExportAnalyticsCsv_InvalidIdentity_ReturnsUnauthorized()
     {
         var repo = new InMemoryShortLinkRepository();
         var link = new ShortenedUrl
@@ -244,7 +244,7 @@ public sealed class AnalyticsCsvExportTests
 
         var result = await controller.ExportAnalyticsCsv(link.Id, default);
 
-        Assert.IsType<NotFoundResult>(result);
+        Assert.IsType<UnauthorizedResult>(result);
     }
 
     // --- End-to-end integration tests ---

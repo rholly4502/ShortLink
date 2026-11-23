@@ -69,31 +69,37 @@ public class ShortLinkApiTests
     }
 
     [Fact]
-    public async Task UpdateUrl_AsNonOwner_ThrowsUnauthorizedAccessException()
+    public async Task UpdateUrl_AsNonOwner_ThrowsUnauthorizedAccessException_EvenWhenPayloadIsInvalid()
     {
         var link = await SeedLink(_owner);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             _service.UpdateUrlAsync(_other, link.Id, "https://example.org", null));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _service.UpdateUrlAsync(_other, link.Id, "javascript:alert(1)", _clock.UtcNow.AddDays(-1)));
         Assert.DoesNotContain(link.Id, _repo.Updated);
     }
 
     [Fact]
-    public async Task UpdateUrl_UnknownId_ThrowsKeyNotFoundException()
+    public async Task UpdateUrl_UnknownId_ThrowsKeyNotFoundException_EvenWhenPayloadIsInvalid()
     {
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             _service.UpdateUrlAsync(_owner, Guid.NewGuid(), "https://example.org", null));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _service.UpdateUrlAsync(_owner, Guid.NewGuid(), "javascript:alert(1)", _clock.UtcNow.AddDays(-1)));
     }
 
     // --- Service: delete ---
 
     [Fact]
-    public async Task DeleteByOwner_AsOwner_RemovesLink()
+    public async Task DeleteByOwner_AsOwner_RemovesAndReturnsLink()
     {
         var link = await SeedLink(_owner);
 
-        await _service.DeleteByOwnerAsync(_owner, link.Id);
+        var deleted = await _service.DeleteByOwnerAsync(_owner, link.Id);
 
+        Assert.Equal(link.Id, deleted.Id);
+        Assert.Equal(link.Slug, deleted.Slug);
         Assert.Contains(link.Id, _repo.Deleted);
     }
 

@@ -52,30 +52,45 @@ public sealed class ShortLinksController : ControllerBase
 
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IReadOnlyList<LinkResponse>>> List(CancellationToken ct)
     {
-        var links = await _service.ListForOwnerAsync(CurrentUserId(), ct);
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
+        var links = await _service.ListForOwnerAsync(ownerId, ct);
         return Ok(links.Select(ToResponse).ToList());
     }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType<LinkResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LinkResponse>> Get(Guid id, CancellationToken ct)
     {
-        var link = await _service.GetForOwnerAsync(CurrentUserId(), id, ct);
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
+        var link = await _service.GetForOwnerAsync(ownerId, id, ct);
         return link is null ? NotFound() : Ok(ToResponse(link));
     }
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType<LinkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LinkResponse>> Update(Guid id, UpdateLinkRequest request, CancellationToken ct)
     {
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
         try
         {
-            var link = await _service.UpdateUrlAsync(CurrentUserId(), id, request.Url, request.ExpiresAt, ct);
+            var link = await _service.UpdateUrlAsync(ownerId, id, request.Url, request.ExpiresAt, ct);
             await TryInvalidateCacheAsync(link.Slug, ct);
             return Ok(ToResponse(link));
         }
@@ -87,19 +102,29 @@ public sealed class ShortLinksController : ControllerBase
 
     [HttpGet("{id:guid}/analytics")]
     [ProducesResponseType<AnalyticsSummary>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AnalyticsSummary>> Analytics(Guid id, CancellationToken ct)
     {
-        var summary = await _service.GetAnalyticsAsync(CurrentUserId(), id, ct);
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
+        var summary = await _service.GetAnalyticsAsync(ownerId, id, ct);
         return summary is null ? NotFound() : Ok(summary);
     }
 
     [HttpGet("{id:guid}/analytics/csv")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ExportAnalyticsCsv(Guid id, CancellationToken ct)
     {
-        var summary = await _service.GetAnalyticsAsync(CurrentUserId(), id, ct);
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
+        var summary = await _service.GetAnalyticsAsync(ownerId, id, ct);
         if (summary is null)
             return NotFound();
 
@@ -110,15 +135,17 @@ public sealed class ShortLinksController : ControllerBase
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
+        var ownerId = CurrentUserId();
+        if (ownerId == Guid.Empty)
+            return Unauthorized();
+
         try
         {
-            var link = await _service.GetForOwnerAsync(CurrentUserId(), id, ct);
-            if (link is null)
-                return NotFound();
-            await _service.DeleteByOwnerAsync(CurrentUserId(), id, ct);
+            var link = await _service.DeleteByOwnerAsync(ownerId, id, ct);
             await TryInvalidateCacheAsync(link.Slug, ct);
             return NoContent();
         }

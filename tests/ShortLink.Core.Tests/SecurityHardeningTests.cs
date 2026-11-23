@@ -52,65 +52,63 @@ public sealed class SecurityHardeningTests
     public void AuthController_IsPublic_NoAuthorize() =>
         Assert.Null(typeof(AuthController).GetCustomAttribute<AuthorizeAttribute>());
 
-    // --- Anti auth-bypass: identitas tanpa subjek valid → deny semua operasi owner ---
+    // --- Anti auth-bypass: identitas tanpa subjek valid → deny semua operasi owner (401 Unauthorized) ---
 
     [Fact]
-    public async Task Get_InvalidIdentity_ReturnsNotFound()
+    public async Task Get_InvalidIdentity_ReturnsUnauthorized()
     {
         var link = await SeedLink(_owner);
         var ctrl = NewController();
 
         var result = await ctrl.Get(link.Id, default);
 
-        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
     [Fact]
-    public async Task Update_InvalidIdentity_ReturnsNotFound_AndDoesNotMutate()
+    public async Task Update_InvalidIdentity_ReturnsUnauthorized_AndDoesNotMutate()
     {
         var link = await SeedLink(_owner);
         var ctrl = NewController();
 
         var result = await ctrl.Update(link.Id, new UpdateLinkRequest("https://evil.example.com", null), default);
 
-        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.IsType<UnauthorizedResult>(result.Result);
         Assert.DoesNotContain(link.Id, _repo.Updated);
     }
 
     [Fact]
-    public async Task Delete_InvalidIdentity_ReturnsNotFound_AndDoesNotMutate()
+    public async Task Delete_InvalidIdentity_ReturnsUnauthorized_AndDoesNotMutate()
     {
         var link = await SeedLink(_owner);
         var ctrl = NewController();
 
         var result = await ctrl.Delete(link.Id, default);
 
-        Assert.IsType<NotFoundResult>(result);
+        Assert.IsType<UnauthorizedResult>(result);
         Assert.DoesNotContain(link.Id, _repo.Deleted);
     }
 
     [Fact]
-    public async Task Analytics_InvalidIdentity_ReturnsNotFound()
+    public async Task Analytics_InvalidIdentity_ReturnsUnauthorized()
     {
         var link = await SeedLink(_owner);
         var ctrl = NewController();
 
         var result = await ctrl.Analytics(link.Id, default);
 
-        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
     [Fact]
-    public async Task List_InvalidIdentity_ReturnsEmpty()
+    public async Task List_InvalidIdentity_ReturnsUnauthorized()
     {
         await SeedLink(_owner);
         var ctrl = NewController();
 
         var result = await ctrl.List(default);
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var links = Assert.IsType<List<LinkResponse>>(ok.Value);
-        Assert.Empty(links);
+        Assert.IsType<UnauthorizedResult>(result.Result);
     }
 
     // --- Fallback klaim "sub" bekerja (bentuk hasil pemetaan inbound JWT) ---
